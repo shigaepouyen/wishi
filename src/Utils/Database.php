@@ -26,6 +26,7 @@ class Database {
         $db->exec("CREATE TABLE IF NOT EXISTS profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
             emoji TEXT,
             color TEXT DEFAULT 'indigo'
         )");

@@ -148,11 +148,16 @@ $color = $list['color'] ?? 'indigo';
                     if (data.success) {
                         // On remplit les champs avec ce qu'on a trouvé
                         this.form.title = data.title || this.form.title;
-                        this.form.price = data.price || this.form.price;
+                        this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
                         this.form.image_url = data.image || this.form.image_url;
                         this.form.description = data.description || this.form.description;
+                    } else if (data.error) {
+                        alert("Erreur de récupération : " + data.error);
                     }
-                } catch (e) { console.error("Erreur de scraping"); }
+                } catch (e) {
+                    console.error("Erreur de scraping");
+                    alert("Impossible de récupérer les informations du lien.");
+                }
                 this.loading = false;
             },
             async submitForm() {

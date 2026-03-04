@@ -25,7 +25,16 @@ class ScraperService {
             }
 
             $embed = new Embed();
-            $info = $embed->get($url);
+            try {
+                $info = $embed->get($url);
+                $title = $info->title;
+                $description = $info->description;
+                $image = (string)$info->image;
+            } catch (\Exception $e) {
+                $title = 'Sans titre';
+                $description = '';
+                $image = '';
+            }
 
             // Extraction avancée du prix
             $priceData = $this->extractAmazonPrice($html);
@@ -34,9 +43,9 @@ class ScraperService {
             $finalPrice = $this->convertToEur($priceData['amount'], $priceData['currency']);
 
             return [
-                'title'       => $info->title ?? 'Sans titre',
-                'description' => $info->description ?? '',
-                'image'       => $this->extractAmazonImage($html) ?? (string)$info->image,
+                'title'       => $title ?: 'Sans titre',
+                'description' => $description ?: '',
+                'image'       => $this->extractAmazonImage($html) ?: $image,
                 'url'         => $url,
                 'price'       => [
                     'amount'   => $finalPrice > 0 ? $finalPrice : '',
