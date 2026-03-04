@@ -1,0 +1,28 @@
+<?php
+// On désactive l'affichage des erreurs pour ne pas polluer le JSON
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('display_errors', 0);
+
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+use App\Services\ScraperService;
+
+header('Content-Type: application/json');
+
+// On récupère l'URL proprement
+$url = $_GET['url'] ?? null;
+
+if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
+    echo json_encode(['error' => 'URL invalide ou absente']);
+    exit;
+}
+
+try {
+    $scraper = new ScraperService();
+    $data = $scraper->getLinkData($url);
+    echo json_encode($data);
+} catch (\Exception $e) {
+    echo json_encode([
+        'error' => 'Erreur technique : ' . $e->getMessage()
+    ]);
+}

@@ -1,0 +1,16 @@
+{
+    "name": "ton-nom/gift-list",
+    "description": "Application de liste de souhaits",
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-curl": "*",
+        "embed/embed": "^4.4",
+        "guzzlehttp/guzzle": "^7.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}

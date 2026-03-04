@@ -1,0 +1,32 @@
+# --- Dépendances PHP ---
+/vendor/
+composer.lock
+.phpunit.result.cache
+
+# --- Base de données SQLite ---
+# On ignore le fichier de données pour ne pas écraser les cadeaux de Zoé et Chloé 
+# lors d'un prochain déploiement.
+*.sqlite
+*.sqlite-journal
+
+# --- Configuration & Secrets ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Logs et Cache ---
+*.log
+/cache/
+/logs/
+
+# --- Fichiers Système ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- PWA & Build ---
+# Si tu génères tes icônes dynamiquement, décommente la ligne suivante :
+# public/assets/img/icons/
