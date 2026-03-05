@@ -91,13 +91,22 @@ class ScraperService {
             $description = $description ?: ($ogData['description'] ?? '');
             $image = $image ?: ($ogData['image'] ?? '');
 
-            // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, etc.)
+            // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, AliExpress, etc.)
             if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
                 foreach ($matches[1] as $jsonText) {
                     $jsonData = json_decode(trim($jsonText), true);
                     if (!$jsonData) continue;
 
-                    $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : [$jsonData];
+                    // Support des tableaux d'objets au top-level ou via @graph
+                    $items = [];
+                    if (isset($jsonData['@graph'])) {
+                        $items = $jsonData['@graph'];
+                    } elseif (isset($jsonData[0])) {
+                        $items = $jsonData;
+                    } else {
+                        $items = [$jsonData];
+                    }
+
                     foreach ($items as $item) {
                         $type = $item['@type'] ?? '';
                         if (str_contains($type, 'Product') || $type === 'Offer') {
@@ -146,7 +155,16 @@ class ScraperService {
                 foreach ($matches[1] as $jsonText) {
                     $jsonData = json_decode(trim($jsonText), true);
                     if (!$jsonData) continue;
-                    $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : [$jsonData];
+
+                    $items = [];
+                    if (isset($jsonData['@graph'])) {
+                        $items = $jsonData['@graph'];
+                    } elseif (isset($jsonData[0])) {
+                        $items = $jsonData;
+                    } else {
+                        $items = [$jsonData];
+                    }
+
                     foreach ($items as $item) {
                         if (isset($item['offers'])) {
                             $offers = is_array($item['offers']) && !isset($item['offers']['price']) ? $item['offers'] : [$item['offers']];
@@ -223,6 +241,7 @@ class ScraperService {
         $jsonPatterns = [
             '/"priceAmount":\s*([0-9.]+)/',                          // Amazon
             '/"price":\s*\{[^}]*?"amount":\s*([0-9.]+)/i',           // AliExpress v1
+            '/"price":\s*"([0-9.]+)"/i',                            // Schema.org simple string
             '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
             '/"minPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v3
             '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/'    // Amazon inputs
