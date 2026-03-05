@@ -2,31 +2,68 @@
 namespace App\Services;
 
 use Embed\Embed;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 
 class ScraperService {
     
-    public function getLinkData(string $url) {
-        $options = [
-            'http' => [
-                'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n" .
-                            "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7\r\n" .
-                            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
-            ]
-        ];
-        $context = stream_context_create($options);
+    private $client;
 
+    public function __construct() {
+        $this->client = new Client([
+            'timeout' => 10,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cache-Control' => 'no-cache',
+                'Pragma' => 'no-cache',
+                'Upgrade-Insecure-Requests' => '1',
+                'Sec-Fetch-Dest' => 'document',
+                'Sec-Fetch-Mode' => 'navigate',
+                'Sec-Fetch-Site' => 'none',
+                'Sec-Fetch-User' => '?1',
+            ],
+            'curl' => [
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_AUTOREFERER => true,
+            ]
+        ]);
+    }
+
+    public function getLinkData(string $url) {
         try {
-            $html = @file_get_contents($url, false, $context);
-            if (!$html) throw new \Exception("Impossible de lire la page (blocage Amazon possible)");
+            $response = $this->client->get($url, [
+                'headers' => [
+                    'Referer' => 'https://www.google.com/',
+                ],
+                'http_errors' => false
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $html = (string)$response->getBody();
+
+            if ($statusCode === 403 || $statusCode === 429) {
+                if (str_contains($html, 'Just a moment...') || str_contains($html, 'challenges.cloudflare.com')) {
+                    throw new \Exception("Le site est protégé par Cloudflare (anti-bot). Veuillez remplir le formulaire manuellement.");
+                }
+                throw new \Exception("Accès refusé par le site (Erreur $statusCode).");
+            }
+
+            if (!$html) throw new \Exception("La page est vide.");
 
             // On vérifie si on n'est pas tombé sur un Captcha
-            if (str_contains($html, 'api-services-support@amazon.com')) {
-                 throw new \Exception("Amazon a bloqué la requête (Captcha)");
+            if (str_contains($html, 'api-services-support@amazon.com') || str_contains($html, 'captcha')) {
+                 throw new \Exception("Le site a bloqué la requête (Captcha détecté)");
             }
 
             $embed = new Embed();
             try {
-                $info = $embed->get($url);
+                // Pour éviter un second appel réseau bloqué, on passe directement la réponse Guzzle à Embed
+                $uri = $embed->getCrawler()->createUri($url);
+                $request = $embed->getCrawler()->createRequest('GET', $uri);
+                $info = $embed->getExtractorFactory()->createExtractor($uri, $request, $response, $embed->getCrawler());
+
                 $title = $info->title;
                 $description = $info->description;
                 $image = (string)$info->image;
