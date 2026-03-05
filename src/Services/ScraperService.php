@@ -3,6 +3,7 @@ namespace App\Services;
 
 use Embed\Embed;
 use GuzzleHttp\Client;
+use GuzzleHttp\Cookie\CookieJar;
 use GuzzleHttp\Exception\RequestException;
 
 class ScraperService {
@@ -11,18 +12,18 @@ class ScraperService {
 
     public function __construct() {
         $this->client = new Client([
-            'timeout' => 15,
+            'timeout' => 20,
+            'cookies' => true,
+            'allow_redirects' => [
+                'max' => 10,
+            ],
             'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Cache-Control' => 'no-cache',
                 'Pragma' => 'no-cache',
                 'Upgrade-Insecure-Requests' => '1',
-                'Sec-Fetch-Dest' => 'document',
-                'Sec-Fetch-Mode' => 'navigate',
-                'Sec-Fetch-Site' => 'none',
-                'Sec-Fetch-User' => '?1',
             ],
             'curl' => [
                 CURLOPT_FOLLOWLOCATION => true,
@@ -33,15 +34,22 @@ class ScraperService {
 
     public function getLinkData(string $url) {
         try {
+            // Pour AliExpress on évite le Referer google qui peut déclencher des redirections infinies
+            $headers = [];
+            if (!str_contains($url, 'aliexpress.com')) {
+                $headers['Referer'] = 'https://www.google.com/';
+            }
+
             $response = $this->client->get($url, [
-                'headers' => [
-                    'Referer' => 'https://www.google.com/',
-                ],
+                'headers' => $headers,
                 'http_errors' => false
             ]);
 
             $statusCode = $response->getStatusCode();
             $html = (string)$response->getBody();
+
+            // Extraction OpenGraph précoce (souvent présent même sur les pages de redirection/captcha)
+            $ogData = $this->extractOpenGraphData($html);
 
             if ($statusCode === 403 || $statusCode === 429) {
                 if (str_contains($html, 'Just a moment...') || str_contains($html, 'challenges.cloudflare.com')) {
@@ -57,8 +65,8 @@ class ScraperService {
 
             if (!$html || strlen($html) < 200) throw new \Exception("La page n'a pas pu être chargée correctement.");
 
-            // On vérifie si on n'est pas tombé sur un Captcha
-            if (str_contains($html, 'api-services-support@amazon.com') || str_contains($html, 'captcha')) {
+            // On vérifie si on n'est pas tombé sur un Captcha (Sauf si on a déjà des données OG utiles)
+            if (empty($ogData['title']) && (str_contains($html, 'api-services-support@amazon.com') || str_contains($html, 'captcha'))) {
                  throw new \Exception("Le site a bloqué la requête (Captcha détecté).");
             }
 
@@ -73,10 +81,15 @@ class ScraperService {
                 $description = $info->description;
                 $image = (string)$info->image;
             } catch (\Exception $e) {
-                $title = '';
-                $description = '';
-                $image = '';
+                $title = $ogData['title'] ?? '';
+                $description = $ogData['description'] ?? '';
+                $image = $ogData['image'] ?? '';
             }
+
+            // Fallbacks robustes via OpenGraph si Embed a échoué
+            $title = $title ?: ($ogData['title'] ?? '');
+            $description = $description ?: ($ogData['description'] ?? '');
+            $image = $image ?: ($ogData['image'] ?? '');
 
             // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, etc.)
             if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
@@ -154,11 +167,13 @@ class ScraperService {
 
             $amazonImages = $this->extractAmazonImages($html);
             $amazonTitle = $this->extractAmazonTitle($html);
+            $aliexpressImages = $this->extractAliexpressImages($html);
 
             // On agrège les images candidates
             $images = [];
-            if (!empty($amazonImages)) $images = array_merge($images, $amazonImages);
             if ($image) $images[] = $image;
+            if (!empty($amazonImages)) $images = array_merge($images, $amazonImages);
+            if (!empty($aliexpressImages)) $images = array_merge($images, $aliexpressImages);
 
             // On enlève les doublons et on s'assure que les URLs sont valides
             $images = array_values(array_unique(array_filter($images)));
@@ -301,5 +316,28 @@ class ScraperService {
             return trim(html_entity_decode($matches[1]));
         }
         return null;
+    }
+
+    private function extractAliexpressImages($html) {
+        $found = [];
+        // AliExpress stocke souvent ses images dans window._d_c_.DCData ou imagePathList
+        if (preg_match('/"imagePathList":\s*(\[.*?\])/is', $html, $matches)) {
+            $list = json_decode($matches[1], true);
+            if ($list) $found = array_merge($found, $list);
+        }
+        return $found;
+    }
+
+    private function extractOpenGraphData($html) {
+        $data = [];
+        // Support property="og:..." et name="og:..."
+        if (preg_match('/<meta.*?(?:property|name)=["\']og:title["\'].*?content=["\'](.*?)["\']/is', $html, $m)) $data['title'] = html_entity_decode(trim($m[1]));
+        if (preg_match('/<meta.*?(?:property|name)=["\']og:description["\'].*?content=["\'](.*?)["\']/is', $html, $m)) $data['description'] = html_entity_decode(trim($m[1]));
+        if (preg_match('/<meta.*?(?:property|name)=["\']og:image["\'].*?content=["\'](.*?)["\']/is', $html, $m)) $data['image'] = trim($m[1]);
+
+        // Fallback si content est avant property
+        if (empty($data['title']) && preg_match('/<meta.*?content=["\'](.*?)["\'].*?(?:property|name)=["\']og:title["\']/is', $html, $m)) $data['title'] = html_entity_decode(trim($m[1]));
+
+        return $data;
     }
 }
