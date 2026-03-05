@@ -73,29 +73,76 @@ class ScraperService {
                 $image = '';
             }
 
-            // Fallbacks manuels si Embed a échoué sur certains champs
+            // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, etc.)
+            if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
+                foreach ($matches[1] as $jsonText) {
+                    $jsonData = json_decode(trim($jsonText), true);
+                    if (!$jsonData) continue;
+
+                    $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : [$jsonData];
+                    foreach ($items as $item) {
+                        $type = $item['@type'] ?? '';
+                        if (str_contains($type, 'Product') || $type === 'Offer') {
+                            $title = $item['name'] ?? $title;
+                            $description = $item['description'] ?? $description;
+                            if (isset($item['image'])) {
+                                $image = is_array($item['image']) ? ($item['image'][0] ?? $image) : $item['image'];
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fallbacks manuels via Meta Tags si nécessaire
             if (!$title && preg_match('/<title>(.*?)<\/title>/is', $html, $matches)) {
                 $title = html_entity_decode(trim($matches[1]));
             }
-            if (!$description && preg_match('/<meta\s+name=["\']description["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
-                $description = html_entity_decode(trim($matches[1]));
+            if (!$description) {
+                if (preg_match('/<meta.*?name=["\']description["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
+                    preg_match('/<meta.*?content=["\'](.*?)["\'].*?name=["\']description["\']/is', $html, $matches)) {
+                    $description = html_entity_decode(trim($matches[1]));
+                }
             }
-            if (!$description && preg_match('/<meta\s+property=["\']og:description["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
-                $description = html_entity_decode(trim($matches[1]));
+            if (!$description) {
+                if (preg_match('/<meta.*?property=["\']og:description["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
+                    preg_match('/<meta.*?content=["\'](.*?)["\'].*?property=["\']og:description["\']/is', $html, $matches)) {
+                    $description = html_entity_decode(trim($matches[1]));
+                }
             }
-            if (!$image && preg_match('/<meta\s+property=["\']og:image["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
-                $image = trim($matches[1]);
-            }
-            if (!$image && preg_match('/<meta\s+name=["\']twitter:image["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
-                $image = trim($matches[1]);
+            if (!$image) {
+                if (preg_match('/<meta.*?property=["\']og:image["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
+                    preg_match('/<meta.*?content=["\'](.*?)["\'].*?property=["\']og:image["\']/is', $html, $matches)) {
+                    $image = trim($matches[1]);
+                }
             }
 
             // Nettoyage final
-            $title = str_replace(["\n", "\r"], ' ', $title);
+            $title = trim(str_replace(["\n", "\r"], ' ', $title));
             $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 500, "...");
 
             // Extraction avancée du prix
             $priceData = $this->extractAmazonPrice($html);
+
+            // Si le prix n'a pas été trouvé (non-Amazon) et qu'on a du JSON-LD, on cherche dedans
+            if ($priceData['amount'] <= 0 && preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
+                foreach ($matches[1] as $jsonText) {
+                    $jsonData = json_decode(trim($jsonText), true);
+                    if (!$jsonData) continue;
+                    $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : [$jsonData];
+                    foreach ($items as $item) {
+                        if (isset($item['offers'])) {
+                            $offers = is_array($item['offers']) && !isset($item['offers']['price']) ? $item['offers'] : [$item['offers']];
+                            foreach ($offers as $offer) {
+                                if (isset($offer['price'])) {
+                                    $priceData['amount'] = floatval($offer['price']);
+                                    $priceData['currency'] = $offer['priceCurrency'] ?? $priceData['currency'];
+                                    break 3;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             
             // Conversion de devise si nécessaire
             $finalPrice = $this->convertToEur($priceData['amount'], $priceData['currency']);
