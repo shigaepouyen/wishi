@@ -68,10 +68,31 @@ class ScraperService {
                 $description = $info->description;
                 $image = (string)$info->image;
             } catch (\Exception $e) {
-                $title = 'Sans titre';
+                $title = '';
                 $description = '';
                 $image = '';
             }
+
+            // Fallbacks manuels si Embed a échoué sur certains champs
+            if (!$title && preg_match('/<title>(.*?)<\/title>/is', $html, $matches)) {
+                $title = html_entity_decode(trim($matches[1]));
+            }
+            if (!$description && preg_match('/<meta\s+name=["\']description["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
+                $description = html_entity_decode(trim($matches[1]));
+            }
+            if (!$description && preg_match('/<meta\s+property=["\']og:description["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
+                $description = html_entity_decode(trim($matches[1]));
+            }
+            if (!$image && preg_match('/<meta\s+property=["\']og:image["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
+                $image = trim($matches[1]);
+            }
+            if (!$image && preg_match('/<meta\s+name=["\']twitter:image["\']\s+content=["\'](.*?)["\']/is', $html, $matches)) {
+                $image = trim($matches[1]);
+            }
+
+            // Nettoyage final
+            $title = str_replace(["\n", "\r"], ' ', $title);
+            $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 500, "...");
 
             // Extraction avancée du prix
             $priceData = $this->extractAmazonPrice($html);
