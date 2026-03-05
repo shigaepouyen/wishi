@@ -28,7 +28,7 @@ class ListController {
             $params[] = $category;
         }
         
-        $items = $db->prepare($itemsQuery . " ORDER BY position ASC");
+        $items = $db->prepare($itemsQuery . " ORDER BY priority DESC, position ASC");
         $items->execute($params);
 
         $categories = $db->prepare("SELECT DISTINCT category FROM items WHERE list_id = ?");
@@ -73,7 +73,8 @@ class ListController {
             case 'price_asc':  $orderBy = "price ASC"; break;
             case 'price_desc': $orderBy = "price DESC"; break;
             case 'priority':   $orderBy = "priority DESC, position ASC"; break;
-            default:           $orderBy = "position ASC"; break;
+            case 'manual':     $orderBy = "position ASC"; break;
+            default:           $orderBy = "priority DESC, position ASC"; break;
         }
         $query .= " ORDER BY $orderBy";
 

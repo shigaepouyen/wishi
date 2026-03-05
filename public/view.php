@@ -74,10 +74,10 @@ $ownerEmoji = $data['list']['owner_emoji'] ?? '🎁';
             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trier par :</label>
             <select onchange="window.location.href='?s=<?= $slug ?>&cat=<?= urlencode($catFilter) ?>&sort=' + this.value" 
                     class="bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-2xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-<?= $color ?>-500 shadow-sm cursor-pointer transition-all">
-                <option value="position" <?= $data['currentSort'] == 'position' ? 'selected' : '' ?>>✨ Ordre de <?= htmlspecialchars($ownerName) ?></option>
-                <option value="priority" <?= $data['currentSort'] == 'priority' ? 'selected' : '' ?>>🔥 Priorité</option>
+                <option value="priority" <?= ($data['currentSort'] == 'priority' || $data['currentSort'] == 'position') ? 'selected' : '' ?>>✨ Ordre de <?= htmlspecialchars($ownerName) ?></option>
                 <option value="price_asc" <?= $data['currentSort'] == 'price_asc' ? 'selected' : '' ?>>Prix croissant</option>
                 <option value="price_desc" <?= $data['currentSort'] == 'price_desc' ? 'selected' : '' ?>>Prix décroissant</option>
+                <option value="manual" <?= $data['currentSort'] == 'manual' ? 'selected' : '' ?>>🎯 Manuel uniquement</option>
             </select>
         </div>
 
