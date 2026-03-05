@@ -163,6 +163,20 @@ class ScraperService {
             // On enlève les doublons et on s'assure que les URLs sont valides
             $images = array_values(array_unique(array_filter($images)));
 
+            // Filtrage par mots-clés (logos, icônes, pixels, etc.)
+            $blacklist = ['logo', 'sprite', 'pixel', 'icon', 'nav', 'menu', 'button', 'loading', 'spacer', 'banner', 'ads'];
+            $images = array_filter($images, function($url) use ($blacklist) {
+                $urlLower = strtolower($url);
+                // Exclure les extensions non-photo
+                if (preg_match('/\.(svg|gif|webp)$/i', $url)) return false;
+                // Exclure si contient un mot de la blacklist
+                foreach ($blacklist as $word) {
+                    if (str_contains($urlLower, $word)) return false;
+                }
+                return true;
+            });
+            $images = array_values($images);
+
             // On trie pour mettre les images sans suffixes de redimensionnement en premier
             usort($images, function($a, $b) {
                 $aClean = !preg_match('/\._[A-Z0-9,._-]+_\./i', $a);
