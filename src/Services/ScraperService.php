@@ -7,13 +7,13 @@ use GuzzleHttp\Exception\RequestException;
 
 class ScraperService {
     
-    private $client;
+    protected $client;
 
     public function __construct() {
         $this->client = new Client([
-            'timeout' => 10,
+            'timeout' => 15,
             'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Cache-Control' => 'no-cache',
@@ -50,11 +50,16 @@ class ScraperService {
                 throw new \Exception("Accès refusé par le site (Erreur $statusCode).");
             }
 
-            if (!$html) throw new \Exception("La page est vide.");
+            // Cas spécifique Amazon WAF / Challenge (souvent 202)
+            if ($statusCode === 202 || (str_contains($html, 'aws-waf-token') && strlen($html) < 5000)) {
+                throw new \Exception("Le site demande une vérification humaine (WAF). Veuillez remplir le formulaire manuellement.");
+            }
+
+            if (!$html || strlen($html) < 200) throw new \Exception("La page n'a pas pu être chargée correctement.");
 
             // On vérifie si on n'est pas tombé sur un Captcha
             if (str_contains($html, 'api-services-support@amazon.com') || str_contains($html, 'captcha')) {
-                 throw new \Exception("Le site a bloqué la requête (Captcha détecté)");
+                 throw new \Exception("Le site a bloqué la requête (Captcha détecté).");
             }
 
             $embed = new Embed();
@@ -147,10 +152,31 @@ class ScraperService {
             // Conversion de devise si nécessaire
             $finalPrice = $this->convertToEur($priceData['amount'], $priceData['currency']);
 
+            $amazonImages = $this->extractAmazonImages($html);
+            $amazonTitle = $this->extractAmazonTitle($html);
+
+            // On agrège les images candidates
+            $images = [];
+            if (!empty($amazonImages)) $images = array_merge($images, $amazonImages);
+            if ($image) $images[] = $image;
+
+            // On enlève les doublons et on s'assure que les URLs sont valides
+            $images = array_values(array_unique(array_filter($images)));
+
+            // On trie pour mettre les images sans suffixes de redimensionnement en premier
+            usort($images, function($a, $b) {
+                $aClean = !preg_match('/\._[A-Z0-9,._-]+_\./i', $a);
+                $bClean = !preg_match('/\._[A-Z0-9,._-]+_\./i', $b);
+                if ($aClean && !$bClean) return -1;
+                if (!$aClean && $bClean) return 1;
+                return 0;
+            });
+
             return [
-                'title'       => $title ?: 'Sans titre',
+                'title'       => $amazonTitle ?: (($title && $title !== 'Sans titre') ? $title : ''),
                 'description' => $description ?: '',
-                'image'       => $this->extractAmazonImage($html) ?: $image,
+                'image'       => $images[0] ?? '', // Image par défaut
+                'images'      => $images,         // Toutes les images candidates
                 'url'         => $url,
                 'price'       => [
                     'amount'   => $finalPrice > 0 ? $finalPrice : '',
@@ -223,11 +249,42 @@ class ScraperService {
         return $amount;
     }
 
-    private function extractAmazonImage($html) {
+    private function extractAmazonImages($html) {
+        $found = [];
         if (preg_match('/data-a-dynamic-image="([^"]+)"/', $html, $matches)) {
             $json = html_entity_decode($matches[1]);
             $images = json_decode($json, true);
-            if ($images) return array_key_first($images);
+            if ($images) {
+                // On trie par taille (la clé est l'URL, la valeur est un array de dimensions)
+                // Mais ici on veut juste les URLs
+                $found = array_keys($images);
+            }
+        }
+
+        // Fallback sur d'autres patterns Amazon (images secondaires)
+        if (preg_match_all('/"hiRes":"([^"]+)"/i', $html, $matches)) {
+            $found = array_merge($found, $matches[1]);
+        }
+        if (preg_match_all('/"large":"([^"]+)"/i', $html, $matches)) {
+            $found = array_merge($found, $matches[1]);
+        }
+
+        // Patterns génériques pour trouver de grandes images dans les balises img (I/ pattern)
+        if (preg_match_all('/https:\/\/m\.media-amazon\.com\/images\/I\/([a-zA-Z0-9+_.-]+)\.jpg/i', $html, $matches)) {
+            foreach ($matches[1] as $imageId) {
+                // On privilégie les images sans suffixes de redimensionnement (_SS, _AC, etc.)
+                if (!preg_match('/\._[A-Z0-9,._-]+_$/i', $imageId)) {
+                    $found[] = "https://m.media-amazon.com/images/I/{$imageId}.jpg";
+                }
+            }
+        }
+
+        return $found;
+    }
+
+    private function extractAmazonTitle($html) {
+        if (preg_match('/id="productTitle"[^>]*>\s*(.*?)\s*<\/span>/is', $html, $matches)) {
+            return trim(html_entity_decode($matches[1]));
         }
         return null;
     }

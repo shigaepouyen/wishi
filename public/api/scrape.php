@@ -27,7 +27,13 @@ try {
             'error' => $data['error']
         ]);
     } else {
-        echo json_encode(array_merge(['success' => true], $data));
+        // On vérifie qu'on n'a pas un résultat vide/générique (site qui bloque silencieusement)
+        $isGeneric = ($data['title'] === 'Sans titre' && empty($data['description']) && empty($data['image']));
+
+        echo json_encode(array_merge([
+            'success' => true,
+            'is_generic' => $isGeneric
+        ], $data));
     }
 } catch (\Exception $e) {
     echo json_encode([

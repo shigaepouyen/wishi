@@ -91,6 +91,21 @@ $color = $list['color'] ?? 'indigo';
                         <template x-if="!form.image_url">
                             <span class="opacity-20">🎁</span>
                         </template>
+
+                        <!-- Image Selector Overlay -->
+                        <template x-if="images.length > 1">
+                            <div class="absolute inset-x-0 bottom-4 flex justify-center gap-2 px-4">
+                                <button @click.prevent="prevImage()" class="bg-white/90 hover:bg-white text-slate-900 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
+                                </button>
+                                <div class="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full text-[10px] font-black text-slate-900 shadow-lg flex items-center">
+                                    <span x-text="currentImageIndex + 1"></span> / <span x-text="images.length"></span>
+                                </div>
+                                <button @click.prevent="nextImage()" class="bg-white/90 hover:bg-white text-slate-900 w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                            </div>
+                        </template>
                     </div>
                     <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2 px-1">Lien de l'image</label>
                     <input type="text" x-model="form.image_url" placeholder="http://image-url.jpg" class="w-full bg-slate-50 border-none rounded-xl px-4 py-2 text-[10px] text-slate-500 outline-none focus:ring-1 focus:ring-<?= $color ?>-400">
@@ -145,6 +160,8 @@ $color = $list['color'] ?? 'indigo';
         return {
             loading: false,
             submitting: false,
+            images: [],
+            currentImageIndex: 0,
             form: {
                 list_id: <?= $list['id'] ?>, // Gardé pour la base de données
                 url: '',
@@ -154,6 +171,14 @@ $color = $list['color'] ?? 'indigo';
                 image_url: '',
                 description: ''
             },
+            nextImage() {
+                this.currentImageIndex = (this.currentImageIndex + 1) % this.images.length;
+                this.form.image_url = this.images[this.currentImageIndex];
+            },
+            prevImage() {
+                this.currentImageIndex = (this.currentImageIndex - 1 + this.images.length) % this.images.length;
+                this.form.image_url = this.images[this.currentImageIndex];
+            },
             async scrapeUrl() {
                 if (!this.form.url.startsWith('http')) return;
                 this.loading = true;
@@ -162,13 +187,25 @@ $color = $list['color'] ?? 'indigo';
                     const res = await fetch('api/scrape.php?url=' + encodeURIComponent(this.form.url));
                     const data = await res.json();
                     if (data.success) {
-                        // On remplit les champs avec ce qu'on a trouvé
-                        this.form.title = data.title || this.form.title;
-                        this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
-                        this.form.image_url = data.image || this.form.image_url;
-                        this.form.description = data.description || this.form.description;
+                        if (data.is_generic) {
+                            // On informe l'utilisateur que le site bloque
+                            alert("Ce site semble bloquer l'accès automatique. Vous devrez remplir le formulaire manuellement.");
+                        } else {
+                            // On remplit les champs avec ce qu'on a trouvé
+                            this.form.title = data.title || this.form.title;
+                            this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
+                            this.form.description = data.description || this.form.description;
 
-                        // Si on a un titre, on met une petite animation ou feedback ?
+                        // Gestion des images
+                        if (data.images && data.images.length > 0) {
+                            this.images = data.images;
+                            this.currentImageIndex = 0;
+                            this.form.image_url = this.images[0];
+                        } else {
+                            this.form.image_url = data.image || this.form.image_url;
+                            this.images = this.form.image_url ? [this.form.image_url] : [];
+                        }
+                        }
                     } else if (data.error) {
                         alert("Erreur de récupération : " + data.error);
                     }
