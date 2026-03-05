@@ -139,7 +139,7 @@ class ScraperService {
             $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 500, "...");
 
             // Extraction avancée du prix
-            $priceData = $this->extractAmazonPrice($html);
+            $priceData = $this->extractPrice($html);
 
             // Si le prix n'a pas été trouvé (non-Amazon) et qu'on a du JSON-LD, on cherche dedans
             if ($priceData['amount'] <= 0 && preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
@@ -218,38 +218,57 @@ class ScraperService {
         }
     }
 
-    private function extractAmazonPrice($html) {
-        // STRATÉGIE 1 : Chercher dans le bloc JSON de données d'achat (Le plus précis dans ton HTML)
-        // On cherche "priceAmount":35.54
-        if (preg_match('/"priceAmount":\s*([0-9.]+)/', $html, $matches)) {
+    protected function extractPrice($html) {
+        // STRATÉGIE 1 : Patterns JSON e-commerce (Amazon, AliExpress, etc.)
+        $jsonPatterns = [
+            '/"priceAmount":\s*([0-9.]+)/',                          // Amazon
+            '/"price":\s*\{[^}]*?"amount":\s*([0-9.]+)/i',           // AliExpress v1
+            '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
+            '/"minPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v3
+            '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/'    // Amazon inputs
+        ];
+
+        foreach ($jsonPatterns as $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                $val = str_replace([' ', ','], ['', '.'], $matches[1]);
+                $val = preg_replace('/[^0-9.]/', '', $val);
+                return [
+                    'amount' => floatval($val),
+                    'currency' => $this->detectCurrency($html)
+                ];
+            }
+        }
+
+        // STRATÉGIE 2 : Meta tags spécifiques au prix
+        if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $html, $matches)) {
             return [
                 'amount' => floatval($matches[1]),
                 'currency' => $this->detectCurrency($html)
             ];
         }
 
-        // STRATÉGIE 2 : Chercher dans les inputs cachés du formulaire d'achat
-        // <input type="hidden" ... value="35.54" ...>
-        if (preg_match('/customerVisiblePrice\]\[amount\]" value="([^"]+)"/', $html, $matches)) {
-            return [
-                'amount' => floatval($matches[1]),
-                'currency' => $this->detectCurrency($html)
-            ];
-        }
+        // STRATÉGIE 3 : Fallback sur la balise visuelle a-offscreen (Amazon) ou classes prix communes
+        $visualPatterns = [
+            '/<span class="a-offscreen">([^<]+)<\/span>/',
+            '/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/i'
+        ];
 
-        // STRATÉGIE 3 : Fallback sur la balise visuelle a-offscreen
-        if (preg_match('/<span class="a-offscreen">([^<]+)<\/span>/', $html, $matches)) {
-            $priceStr = html_entity_decode($matches[1]);
-            $currency = (str_contains($priceStr, '€')) ? 'EUR' : ((str_contains($priceStr, '$')) ? 'USD' : 'GBP');
-            
-            // Nettoyage des caractères non numériques (garde chiffres, points et virgules)
-            $clean = preg_replace('/[^\d,.]/', '', $priceStr);
-            $clean = str_replace(',', '.', $clean);
-            
-            return [
-                'amount' => floatval($clean),
-                'currency' => $currency
-            ];
+        foreach ($visualPatterns as $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                $priceStr = html_entity_decode($matches[1]);
+                $currency = (str_contains($priceStr, '€')) ? 'EUR' : ((str_contains($priceStr, '$')) ? 'USD' : 'GBP');
+
+                $clean = preg_replace('/[^\d,.]/', '', $priceStr);
+                $clean = str_replace(',', '.', $clean);
+
+                $amount = floatval($clean);
+                if ($amount > 0) {
+                    return [
+                        'amount' => $amount,
+                        'currency' => $currency
+                    ];
+                }
+            }
         }
 
         return ['amount' => 0, 'currency' => 'EUR'];
