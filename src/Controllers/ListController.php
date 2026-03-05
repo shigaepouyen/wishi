@@ -48,8 +48,13 @@ class ListController {
     public function showPublic(string $slug, string $sort = 'position', string $category = '') {
         $db = \App\Utils\Database::getConnection();
         
-        // 1. Récupérer la liste
-        $stmt = $db->prepare("SELECT * FROM lists WHERE slug_public = ?");
+        // 1. Récupérer la liste avec les infos du profil
+        $stmt = $db->prepare("
+            SELECT l.*, p.color, p.name as owner_name, p.emoji as owner_emoji, p.slug as profile_slug
+            FROM lists l
+            JOIN profiles p ON l.profile_id = p.id
+            WHERE l.slug_public = ?
+        ");
         $stmt->execute([$slug]);
         $list = $stmt->fetch();
         if (!$list) return null;

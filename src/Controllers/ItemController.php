@@ -9,26 +9,32 @@ class ItemController {
     public function save() {
         $input = json_decode(file_get_contents('php://input'), true);
 
-        if (!$input || !isset($input['title'])) {
+        if (!$input || !isset($input['title']) || !isset($input['list_id'])) {
             return json_encode(['error' => 'Données invalides']);
         }
 
         try {
             $db = Database::getConnection();
             
+            // On récupère la position max actuelle pour mettre le nouveau cadeau à la fin
+            $posStmt = $db->prepare("SELECT MAX(position) FROM items WHERE list_id = ?");
+            $posStmt->execute([$input['list_id']]);
+            $maxPos = (int)$posStmt->fetchColumn();
+
             $stmt = $db->prepare("INSERT INTO items (
-                list_id, title, description, image_url, url, price, priority, category
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                list_id, title, description, image_url, url, price, priority, category, position
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $stmt->execute([
-                1, // ID de la liste par défaut
+                $input['list_id'],
                 $input['title'],
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
                 $input['url'] ?? '',
                 (float)($input['price'] ?? 0),
                 (int)($input['priority'] ?? 1),
-                $input['category'] ?? 'Divers'
+                $input['category'] ?? 'Divers',
+                $maxPos + 1
             ]);
 
             return json_encode(['success' => true, 'id' => $db->lastInsertId()]);
@@ -51,7 +57,7 @@ class ItemController {
 
         try {
             $db = \App\Utils\Database::getConnection();
-            $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by_name = ? WHERE id = ?");
+            $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by = ? WHERE id = ?");
             $stmt->execute([$name, $itemId]);
 
             return json_encode(['success' => true]);
