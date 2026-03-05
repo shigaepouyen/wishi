@@ -77,7 +77,6 @@ $ownerEmoji = $data['list']['owner_emoji'] ?? '🎁';
                 <option value="priority" <?= ($data['currentSort'] == 'priority' || $data['currentSort'] == 'position') ? 'selected' : '' ?>>✨ Ordre de <?= htmlspecialchars($ownerName) ?></option>
                 <option value="price_asc" <?= $data['currentSort'] == 'price_asc' ? 'selected' : '' ?>>Prix croissant</option>
                 <option value="price_desc" <?= $data['currentSort'] == 'price_desc' ? 'selected' : '' ?>>Prix décroissant</option>
-                <option value="manual" <?= $data['currentSort'] == 'manual' ? 'selected' : '' ?>>🎯 Manuel uniquement</option>
             </select>
         </div>
 

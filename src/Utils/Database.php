@@ -56,7 +56,7 @@ class Database {
             priority INTEGER DEFAULT 1,
             position INTEGER DEFAULT 0,
             is_taken INTEGER DEFAULT 0,
-            taken_by_name TEXT,
+            taken_by TEXT,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         )");
 
