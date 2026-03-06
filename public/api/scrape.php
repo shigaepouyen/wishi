@@ -20,9 +20,24 @@ if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
 try {
     $scraper = new ScraperService();
     $data = $scraper->getLinkData($url);
-    echo json_encode($data);
+
+    if (isset($data['error'])) {
+        echo json_encode([
+            'success' => false,
+            'error' => $data['error']
+        ]);
+    } else {
+        // On vérifie qu'on n'a pas un résultat vide/générique (site qui bloque silencieusement)
+        $isGeneric = ($data['title'] === 'Sans titre' && empty($data['description']) && empty($data['image']));
+
+        echo json_encode(array_merge([
+            'success' => true,
+            'is_generic' => $isGeneric
+        ], $data));
+    }
 } catch (\Exception $e) {
     echo json_encode([
+        'success' => false,
         'error' => 'Erreur technique : ' . $e->getMessage()
     ]);
 }

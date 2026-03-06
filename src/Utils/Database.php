@@ -15,6 +15,25 @@ class Database {
             self::$instance->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             // Activer les clés étrangères pour la suppression en cascade
             self::$instance->exec('PRAGMA foreign_keys = ON;');
+
+            // Migration automatique : assure l'existence de la colonne 'taken_by'
+            try {
+                $columns = self::$instance->query("PRAGMA table_info(items)")->fetchAll();
+                $hasOld = false;
+                $hasNew = false;
+                foreach ($columns as $col) {
+                    if ($col['name'] === 'taken_by_name') $hasOld = true;
+                    if ($col['name'] === 'taken_by') $hasNew = true;
+                }
+
+                if (!$hasNew) {
+                    if ($hasOld) {
+                        self::$instance->exec("ALTER TABLE items RENAME COLUMN taken_by_name TO taken_by;");
+                    } else {
+                        self::$instance->exec("ALTER TABLE items ADD COLUMN taken_by TEXT;");
+                    }
+                }
+            } catch (\Exception $e) {}
         }
         return self::$instance;
     }
@@ -26,6 +45,7 @@ class Database {
         $db->exec("CREATE TABLE IF NOT EXISTS profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
             emoji TEXT,
             color TEXT DEFAULT 'indigo'
         )");
@@ -55,7 +75,7 @@ class Database {
             priority INTEGER DEFAULT 1,
             position INTEGER DEFAULT 0,
             is_taken INTEGER DEFAULT 0,
-            taken_by_name TEXT,
+            taken_by TEXT,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         )");
 
