@@ -87,7 +87,7 @@ $color = $profile['color'] ?: 'indigo';
                 <div class="grid grid-cols-2 gap-6">
                     <div>
                         <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Emoji</label>
-                        <input type="text" x-model="profileForm.emoji" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 text-2xl bg-transparent">
+                        <?php $xModel = 'profileForm.emoji'; include __DIR__ . '/components/emoji_picker.php'; ?>
                     </div>
                     <div>
                         <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Couleur</label>
