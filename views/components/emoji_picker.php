@@ -1,10 +1,4 @@
-<div x-data="{
-    open: false,
-    selectEmoji(e) {
-        <?= $xModel ?> = e;
-        this.open = false;
-    }
-}" class="relative">
+<div x-data="{ open: false }" class="relative">
     <button @click="open = !open" type="button" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?? 'indigo' ?>-500 text-3xl bg-transparent text-left flex items-center justify-between transition-colors">
         <span x-text="<?= $xModel ?>"></span>
         <svg class="w-4 h-4 text-slate-300 transition-transform duration-300" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
@@ -22,7 +16,7 @@
                     <h4 class="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2 mt-3"><?= $category ?></h4>
                     <div class="grid grid-cols-6 gap-1">
                         <?php foreach($list as $emoji): ?>
-                            <button @click="selectEmoji(<?= json_encode($emoji) ?>)"
+                            <button @click="<?= $xModel ?> = <?= htmlspecialchars(json_encode($emoji)) ?>; open = false"
                                     type="button"
                                     class="text-2xl hover:bg-slate-50 p-1 rounded-lg transition-colors flex items-center justify-center aspect-square">
                                 <span><?= $emoji ?></span>
