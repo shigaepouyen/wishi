@@ -80,7 +80,12 @@
                         </div>
                         <div>
                             <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Catégorie</label>
-                            <input type="text" x-model="form.category" placeholder="Ex: Mode, Maison..." class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-xl bg-transparent transition-all placeholder:opacity-20">
+                            <input type="text" x-model="form.category" list="category-suggestions" placeholder="Ex: Mode, Maison..." class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-xl bg-transparent transition-all placeholder:opacity-20">
+                            <datalist id="category-suggestions">
+                                <?php foreach ($existingCategories as $cat): ?>
+                                    <option value="<?= htmlspecialchars($cat) ?>">
+                                <?php endforeach; ?>
+                            </datalist>
                         </div>
                     </div>
 

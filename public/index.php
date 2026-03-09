@@ -26,6 +26,11 @@ if (!$list) {
     exit;
 }
 
+// Récupération des catégories existantes pour les suggestions
+$catStmt = $db->prepare("SELECT DISTINCT category FROM items WHERE list_id = ? AND category != '' ORDER BY category ASC");
+$catStmt->execute([$list['id']]);
+$existingCategories = $catStmt->fetchAll(PDO::FETCH_COLUMN);
+
 $color = $list['color'] ?? 'indigo';
 $title = "Ajouter un souhait - Wishi";
 $body_class = "bg-$color-50/30";
@@ -67,7 +72,7 @@ function addGiftForm() {
                 const data = await res.json();
                 if (data.success) {
                     if (data.is_generic) {
-                        alert("Ce site semble bloquer l\'accès automatique. Vous devrez remplir le formulaire manuellement.");
+                        window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Ce site semble bloquer l\'accès automatique. Remplissage manuel nécessaire.", type: "info" } }));
                     } else {
                         this.form.title = data.title || this.form.title;
                         this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
@@ -81,13 +86,14 @@ function addGiftForm() {
                             this.form.image_url = data.image || this.form.image_url;
                             this.images = this.form.image_url ? [this.form.image_url] : [];
                         }
+                        window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Informations récupérées avec succès !", type: "success" } }));
                     }
                 } else if (data.error) {
-                    alert("Erreur de récupération : " + data.error);
+                    window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : " + data.error, type: "error" } }));
                 }
             } catch (e) {
                 console.error("Erreur de scraping");
-                alert("Impossible de récupérer les informations du lien.");
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Impossible de récupérer les informations du lien.", type: "error" } }));
             }
             this.loading = false;
         },
@@ -99,10 +105,15 @@ function addGiftForm() {
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify(this.form)
                 });
-                if ((await res.json()).success) {
+                const result = await res.json();
+                if (result.success) {
                     window.location.href = "list.php?slug=' . $list['slug_admin'] . '";
+                } else {
+                    window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : " + result.error, type: "error" } }));
                 }
-            } catch (e) { alert("Erreur lors de l\'enregistrement"); }
+            } catch (e) {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur lors de l\'enregistrement", type: "error" } }));
+            }
             this.submitting = false;
         }
     }

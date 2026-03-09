@@ -92,33 +92,10 @@ class ScraperService {
             $image = $image ?: ($ogData['image'] ?? '');
 
             // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, AliExpress, etc.)
-            if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
-                foreach ($matches[1] as $jsonText) {
-                    $jsonData = json_decode(trim($jsonText), true);
-                    if (!$jsonData) continue;
-
-                    // Support des tableaux d'objets au top-level ou via @graph
-                    $items = [];
-                    if (isset($jsonData['@graph'])) {
-                        $items = $jsonData['@graph'];
-                    } elseif (isset($jsonData[0])) {
-                        $items = $jsonData;
-                    } else {
-                        $items = [$jsonData];
-                    }
-
-                    foreach ($items as $item) {
-                        $type = $item['@type'] ?? '';
-                        if (str_contains($type, 'Product') || $type === 'Offer') {
-                            $title = $item['name'] ?? $title;
-                            $description = $item['description'] ?? $description;
-                            if (isset($item['image'])) {
-                                $image = is_array($item['image']) ? ($item['image'][0] ?? $image) : $item['image'];
-                            }
-                        }
-                    }
-                }
-            }
+            $ldData = $this->extractJsonLdData($html);
+            $title = $ldData['title'] ?: $title;
+            $description = $ldData['description'] ?: $description;
+            $image = $ldData['image'] ?: $image;
 
             // Fallbacks manuels via Meta Tags si nécessaire
             if (!$title && preg_match('/<title>(.*?)<\/title>/is', $html, $matches)) {
@@ -150,34 +127,10 @@ class ScraperService {
             // Extraction avancée du prix
             $priceData = $this->extractPrice($html);
 
-            // Si le prix n'a pas été trouvé (non-Amazon) et qu'on a du JSON-LD, on cherche dedans
-            if ($priceData['amount'] <= 0 && preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
-                foreach ($matches[1] as $jsonText) {
-                    $jsonData = json_decode(trim($jsonText), true);
-                    if (!$jsonData) continue;
-
-                    $items = [];
-                    if (isset($jsonData['@graph'])) {
-                        $items = $jsonData['@graph'];
-                    } elseif (isset($jsonData[0])) {
-                        $items = $jsonData;
-                    } else {
-                        $items = [$jsonData];
-                    }
-
-                    foreach ($items as $item) {
-                        if (isset($item['offers'])) {
-                            $offers = is_array($item['offers']) && !isset($item['offers']['price']) ? $item['offers'] : [$item['offers']];
-                            foreach ($offers as $offer) {
-                                if (isset($offer['price'])) {
-                                    $priceData['amount'] = floatval($offer['price']);
-                                    $priceData['currency'] = $offer['priceCurrency'] ?? $priceData['currency'];
-                                    break 3;
-                                }
-                            }
-                        }
-                    }
-                }
+            // Si le prix n'a pas été trouvé par les regex, on utilise les données JSON-LD
+            if ($priceData['amount'] <= 0 && $ldData['price']) {
+                $priceData['amount'] = $ldData['price'];
+                $priceData['currency'] = $ldData['currency'] ?: $priceData['currency'];
             }
             
             // Conversion de devise si nécessaire
@@ -305,13 +258,23 @@ class ScraperService {
         if ($currency === 'EUR' || $amount <= 0) return $amount;
 
         try {
-            $url = "https://api.frankfurter.app/latest?amount={$amount}&from={$currency}&to=EUR";
-            $response = @file_get_contents($url);
-            if ($response) {
-                $data = json_decode($response, true);
+            $response = $this->client->get("https://api.frankfurter.app/latest", [
+                'query' => [
+                    'amount' => $amount,
+                    'from' => $currency,
+                    'to' => 'EUR'
+                ],
+                'timeout' => 5
+            ]);
+
+            if ($response->getStatusCode() === 200) {
+                $data = json_decode((string)$response->getBody(), true);
                 return round($data['rates']['EUR'], 2);
             }
-        } catch (\Exception $e) { return $amount; }
+        } catch (\Exception $e) {
+            // En cas d'échec de l'API de conversion, on garde le montant original
+            return $amount;
+        }
         
         return $amount;
     }
@@ -364,6 +327,55 @@ class ScraperService {
             if ($list) $found = array_merge($found, $list);
         }
         return $found;
+    }
+
+    /**
+     * Extrait les données structurées JSON-LD
+     */
+    private function extractJsonLdData($html) {
+        $data = ['title' => null, 'description' => null, 'image' => null, 'price' => null, 'currency' => null];
+
+        if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
+            foreach ($matches[1] as $jsonText) {
+                $jsonData = json_decode(trim($jsonText), true);
+                if (!$jsonData) continue;
+
+                $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : (isset($jsonData[0]) ? $jsonData : [$jsonData]);
+
+                foreach ($items as $item) {
+                    $type = $item['@type'] ?? '';
+                    $isProduct = str_contains($type, 'Product') || $type === 'Offer';
+
+                    if ($isProduct) {
+                        $data['title'] = $item['name'] ?? $data['title'];
+                        $data['description'] = $item['description'] ?? $data['description'];
+                        if (isset($item['image'])) {
+                            $data['image'] = is_array($item['image']) ? ($item['image'][0] ?? $data['image']) : $item['image'];
+                        }
+                    }
+
+                    // Extraction du prix dans le JSON-LD
+                    if (isset($item['offers'])) {
+                        $offers = is_array($item['offers']) && !isset($item['offers']['price']) ? $item['offers'] : [$item['offers']];
+                        foreach ($offers as $offer) {
+                            if (isset($offer['price']) && $offer['price'] > 0) {
+                                $data['price'] = floatval($offer['price']);
+                                $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
+                            } elseif (isset($offer['priceSpecification'])) {
+                                $spec = is_array($offer['priceSpecification']) && !isset($offer['priceSpecification']['price'])
+                                    ? $offer['priceSpecification'][0]
+                                    : $offer['priceSpecification'];
+                                if (isset($spec['price'])) {
+                                    $data['price'] = floatval($spec['price']);
+                                    $data['currency'] = $spec['priceCurrency'] ?? $data['currency'];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $data;
     }
 
     private function extractOpenGraphData($html) {
