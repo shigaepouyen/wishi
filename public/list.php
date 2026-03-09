@@ -71,11 +71,14 @@ function adminList() {
         },
 
         async saveEdit() {
-            if(this.form.category) {
-                this.form.category = this.form.category.trim().charAt(0).toUpperCase() + this.form.category.trim().slice(1);
-            }
             const response = await fetch("api/update_item.php", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(this.form) });
-            if((await response.json()).success) window.location.reload();
+            const result = await response.json();
+            if(result.success) {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Modification enregistrée !", type: "success" } }));
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : " + result.error, type: "error" } }));
+            }
         },
 
         confirmDeletion(id) {
@@ -85,7 +88,13 @@ function adminList() {
 
         async executeDelete() {
             const response = await fetch("api/delete_item.php", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ id: this.itemToDelete }) });
-            if((await response.json()).success) window.location.reload();
+            const result = await response.json();
+            if(result.success) {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Souhait supprimé !", type: "success" } }));
+                window.location.reload();
+            } else {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : " + result.error, type: "error" } }));
+            }
         },
 
         async saveSettings() {

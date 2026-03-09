@@ -6,12 +6,22 @@ use PDO;
 
 class ItemController {
     
+    private function normalizeCategory(?string $category): string {
+        if (!$category) return 'Divers';
+        $category = trim($category);
+        if (empty($category)) return 'Divers';
+        // Capitaliser la première lettre
+        return mb_convert_case($category, MB_CASE_TITLE, "UTF-8");
+    }
+
     public function save() {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!$input || !isset($input['title']) || !isset($input['list_id'])) {
             return json_encode(['error' => 'Données invalides']);
         }
+
+        $category = $this->normalizeCategory($input['category'] ?? null);
 
         try {
             $db = Database::getConnection();
@@ -33,7 +43,7 @@ class ItemController {
                 $input['url'] ?? '',
                 (float)($input['price'] ?? 0),
                 (int)($input['priority'] ?? 1),
-                $input['category'] ?? 'Divers',
+                $category,
                 $maxPos + 1
             ]);
 
@@ -126,6 +136,8 @@ class ItemController {
 
         if (!$id) return json_encode(['error' => 'ID manquant']);
 
+        $category = $this->normalizeCategory($input['category'] ?? null);
+
         try {
             $db = \App\Utils\Database::getConnection();
             $stmt = $db->prepare("UPDATE items SET 
@@ -136,7 +148,7 @@ class ItemController {
                 $input['title'],
                 (float)$input['price'],
                 (int)$input['priority'],
-                $input['category'],
+                $category,
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
                 $id
