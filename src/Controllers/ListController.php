@@ -45,7 +45,7 @@ class ListController {
     /**
      * Vue Publique : Utilise 'position' comme tri par défaut
      */
-    public function showPublic(string $slug, string $sort = 'position', string $category = '') {
+    public function showPublic(string $slug, string $sort = 'position', string $category = '', bool $includeTaken = false) {
         $db = \App\Utils\Database::getConnection();
         
         // 1. Récupérer la liste avec les infos du profil
@@ -60,7 +60,10 @@ class ListController {
         if (!$list) return null;
 
         // 2. Construire la requête des articles
-        $query = "SELECT * FROM items WHERE list_id = ? AND is_taken = 0";
+        $query = "SELECT * FROM items WHERE list_id = ?";
+        if (!$includeTaken) {
+            $query .= " AND is_taken = 0";
+        }
         $params = [$list['id']];
 
         if ($category !== '') {
@@ -123,7 +126,7 @@ class ListController {
 
     public function resetReservations(int $id) {
         $db = \App\Utils\Database::getConnection();
-        $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL WHERE list_id = ?");
+        $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL WHERE list_id = ?");
         $stmt->execute([$id]);
         return json_encode(['success' => true]);
     }

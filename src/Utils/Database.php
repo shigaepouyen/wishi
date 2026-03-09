@@ -76,6 +76,7 @@ class Database {
             position INTEGER DEFAULT 0,
             is_taken INTEGER DEFAULT 0,
             taken_by TEXT,
+            donor_email TEXT,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         )");
 
