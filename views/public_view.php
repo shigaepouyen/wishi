@@ -73,7 +73,10 @@
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
                             <span class="text-[9px] font-black text-<?= $color ?>-500 uppercase tracking-widest mb-1"><?= htmlspecialchars($item['category'] ?: 'Souhait') ?></span>
                             <h3 class="font-bold text-slate-800 text-lg leading-tight truncate-2-lines"><?= htmlspecialchars($item['title']) ?></h3>
-                            <p class="font-black text-xl mt-1 text-slate-900 tracking-tight"><?= number_format($item['price'], 2, ',', ' ') ?> €</p>
+                            <?php if (!empty($item['description'])): ?>
+                                <p class="text-[11px] text-slate-500 mt-1.5 leading-snug line-clamp-3"><?= nl2br(htmlspecialchars($item['description'])) ?></p>
+                            <?php endif; ?>
+                            <p class="font-black text-xl mt-2 text-slate-900 tracking-tight"><?= number_format($item['price'], 2, ',', ' ') ?> €</p>
                         </div>
                     </div>
 

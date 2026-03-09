@@ -32,6 +32,7 @@ $body_class = "bg-$color-50/30";
 $body_attrs = 'x-data="adminList()" x-init="initSortable()"';
 $extra_css = '
     .truncate-2-lines { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .sortable-ghost { opacity: 0.3; background: #f8fafc; border: 2px dashed #cbd5e1; }
 ';
 $extra_js = '

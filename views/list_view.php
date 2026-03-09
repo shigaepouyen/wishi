@@ -76,9 +76,12 @@
                         <div class="w-20 h-20 shrink-0 bg-slate-50 rounded-xl overflow-hidden border border-slate-50">
                             <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.png') ?>" class="w-full h-full object-cover">
                         </div>
-                        <div class="min-w-0">
+                        <div class="min-w-0 flex-1">
                             <span class="text-[8px] font-black text-<?= $color ?>-500 uppercase tracking-widest truncate block"><?= htmlspecialchars($item['category'] ?: 'Divers') ?></span>
                             <h3 class="font-bold text-slate-800 leading-tight truncate-2-lines mt-0.5 text-sm"><?= htmlspecialchars($item['title']) ?></h3>
+                            <?php if (!empty($item['description'])): ?>
+                                <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2 italic"><?= htmlspecialchars($item['description']) ?></p>
+                            <?php endif; ?>
                             <p class="font-black text-lg text-slate-900 mt-1"><?= number_format($item['price'], 2, ',', ' ') ?> €</p>
                         </div>
                     </div>
@@ -119,6 +122,14 @@
                     <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Catégorie</label>
                     <input type="text" x-model="form.category" list="cat-edit-list" class="w-full border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold bg-transparent">
                     <datalist id="cat-edit-list"><?php foreach($categories as $cat): ?><option value="<?= htmlspecialchars($cat) ?>"><?php endforeach; ?></datalist>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Description</label>
+                    <textarea x-model="form.description" rows="3" class="w-full border border-slate-100 rounded-xl p-3 outline-none focus:border-<?= $color ?>-500 font-medium text-sm bg-slate-50 transition-all" placeholder="Détails, taille, couleur..."></textarea>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">URL de l'image</label>
+                    <input type="text" x-model="form.image_url" class="w-full border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-mono text-[10px] text-slate-500 bg-transparent">
                 </div>
             </div>
             <div class="mt-10 flex gap-3">
