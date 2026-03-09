@@ -25,6 +25,7 @@ $body_class = "bg-$color-50/30";
 $body_attrs = 'x-data="publicList()"';
 $extra_css = '
     .truncate-2-lines { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 ';
 
 ob_start();
