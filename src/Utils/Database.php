@@ -33,6 +33,15 @@ class Database {
                         self::$instance->exec("ALTER TABLE items ADD COLUMN taken_by TEXT;");
                     }
                 }
+
+                // Migration : assure l'existence de la colonne 'donor_email'
+                $hasEmail = false;
+                foreach ($columns as $col) {
+                    if ($col['name'] === 'donor_email') $hasEmail = true;
+                }
+                if (!$hasEmail) {
+                    self::$instance->exec("ALTER TABLE items ADD COLUMN donor_email TEXT;");
+                }
             } catch (\Exception $e) {}
         }
         return self::$instance;
