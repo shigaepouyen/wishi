@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Utils\UrlUtils;
 use Embed\Embed;
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
@@ -16,6 +17,7 @@ class ScraperService {
             'cookies' => true,
             'allow_redirects' => [
                 'max' => 10,
+                'track_redirects' => true
             ],
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -46,6 +48,16 @@ class ScraperService {
             ]);
 
             $statusCode = $response->getStatusCode();
+            // On récupère l'URL finale (après éventuelles redirections, important pour amzn.to)
+            $finalUrl = $url;
+            if ($response->hasHeader('X-GUZZLE-REDIRECT-HISTORY')) {
+                $history = $response->getHeader('X-GUZZLE-REDIRECT-HISTORY');
+                $finalUrl = end($history);
+            }
+
+            // Nettoyage de l'URL Amazon
+            $url = UrlUtils::cleanAmazonUrl($finalUrl);
+
             $html = (string)$response->getBody();
 
             // Extraction OpenGraph précoce (souvent présent même sur les pages de redirection/captcha)
