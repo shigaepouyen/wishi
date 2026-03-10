@@ -88,6 +88,9 @@
 
                     <div class="flex gap-4 mt-auto pt-3 border-t border-slate-50">
                         <button @click="editItem(<?= htmlspecialchars(json_encode($item)) ?>)" class="text-[9px] font-bold text-slate-400 hover:text-<?= $color ?>-600 uppercase tracking-widest">Modifier</button>
+                        <?php if (!empty($item['url'])): ?>
+                            <a href="<?= htmlspecialchars($item['url']) ?>" target="_blank" class="text-[9px] font-bold text-slate-400 hover:text-<?= $color ?>-600 uppercase tracking-widest">Voir</a>
+                        <?php endif; ?>
                         <button @click="confirmDeletion(<?= $item['id'] ?>)" class="text-[9px] font-bold text-slate-300 hover:text-red-500 uppercase tracking-widest ml-auto">Supprimer</button>
                     </div>
                 </div>
@@ -128,8 +131,35 @@
                     <textarea x-model="form.description" rows="3" class="w-full border border-slate-100 rounded-xl p-3 outline-none focus:border-<?= $color ?>-500 font-medium text-sm bg-slate-50 transition-all" placeholder="Détails, taille, couleur..."></textarea>
                 </div>
                 <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">URL de l'image</label>
-                    <input type="text" x-model="form.image_url" class="w-full border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-mono text-[10px] text-slate-500 bg-transparent">
+                    <label for="product_url" class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Lien du produit</label>
+                    <div class="flex gap-2">
+                        <input id="product_url" type="url" x-model="form.url" class="flex-1 border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-mono text-[10px] text-slate-500 bg-transparent">
+                        <button @click="scrapeUrl()" :disabled="loading" class="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-bold uppercase tracking-wider hover:bg-<?= $color ?>-100 hover:text-<?= $color ?>-600 transition-all disabled:opacity-50">
+                            <span x-show="!loading">Mettre à jour ✨</span>
+                            <span x-show="loading">...</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Image</label>
+                        <template x-if="images.length > 1">
+                            <div class="flex items-center gap-2">
+                                <button @click.prevent="prevImage()" class="p-1 text-slate-400 hover:text-<?= $color ?>-600 transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M15 19l-7-7 7-7"/></svg></button>
+                                <span class="text-[9px] font-bold text-slate-400"><span x-text="currentImageIndex + 1"></span>/<span x-text="images.length"></span></span>
+                                <button @click.prevent="nextImage()" class="p-1 text-slate-400 hover:text-<?= $color ?>-600 transition-colors"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M9 5l7 7-7 7"/></svg></button>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="flex gap-4 items-start">
+                        <div class="w-16 h-16 shrink-0 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+                            <template x-if="form.image_url">
+                                <img :src="form.image_url" class="w-full h-full object-cover">
+                            </template>
+                        </div>
+                        <input type="text" x-model="form.image_url" class="flex-1 border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-mono text-[10px] text-slate-500 bg-transparent" placeholder="URL de l'image">
+                    </div>
                 </div>
             </div>
             <div class="mt-10 flex gap-3">
