@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Utils\Database;
+use App\Utils\UrlUtils;
 use PDO;
 
 class ItemController {
@@ -40,7 +41,7 @@ class ItemController {
                 $input['title'],
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
-                $input['url'] ?? '',
+                UrlUtils::cleanAmazonUrl($input['url'] ?? ''),
                 (float)($input['price'] ?? 0),
                 (int)($input['priority'] ?? 1),
                 $category,
@@ -141,7 +142,7 @@ class ItemController {
         try {
             $db = \App\Utils\Database::getConnection();
             $stmt = $db->prepare("UPDATE items SET 
-                title = ?, price = ?, priority = ?, category = ?, description = ?, image_url = ? 
+                title = ?, price = ?, priority = ?, category = ?, description = ?, image_url = ?, url = ?
                 WHERE id = ?");
             
             $stmt->execute([
@@ -151,6 +152,7 @@ class ItemController {
                 $category,
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
+                UrlUtils::cleanAmazonUrl($input['url'] ?? ''),
                 $id
             ]);
 
