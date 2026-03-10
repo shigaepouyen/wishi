@@ -44,6 +44,18 @@ class UrlUtils {
             return "https://{$domain}/dp/{$asin}?tag=shig-21";
         }
 
-        return $url;
+        // Si on n'a pas trouvé d'ASIN mais que c'est Amazon, on s'assure au moins d'avoir le tag
+        $query = isset($parsedUrl['query']) ? $parsedUrl['query'] : '';
+        parse_str($query, $params);
+        $params['tag'] = 'shig-21';
+        $newQuery = http_build_query($params);
+
+        $newUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . ($parsedUrl['path'] ?? '');
+        $newUrl .= '?' . $newQuery;
+        if (isset($parsedUrl['fragment'])) {
+            $newUrl .= '#' . $parsedUrl['fragment'];
+        }
+
+        return $newUrl;
     }
 }
