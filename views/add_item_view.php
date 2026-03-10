@@ -72,10 +72,14 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
-                            <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Prix Estimé (€)</label>
-                            <div class="flex items-center gap-2">
-                                <input type="number" step="0.01" x-model="form.price" placeholder="0.00" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-2xl bg-transparent transition-all placeholder:opacity-20">
-                                <span class="text-xl font-bold text-slate-300">€</span>
+                            <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Prix Estimé</label>
+                            <div class="flex items-center gap-4">
+                                <input type="number" step="0.01" x-model="form.price" placeholder="0.00" class="flex-grow border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-2xl bg-transparent transition-all placeholder:opacity-20">
+                                <select x-model="form.currency" class="border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-xl bg-transparent transition-all cursor-pointer">
+                                    <option value="EUR">€ (EUR)</option>
+                                    <option value="USD">$ (USD)</option>
+                                    <option value="GBP">£ (GBP)</option>
+                                </select>
                             </div>
                         </div>
                         <div>

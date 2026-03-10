@@ -82,7 +82,12 @@
                             <?php if (!empty($item['description'])): ?>
                                 <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2 italic"><?= htmlspecialchars($item['description']) ?></p>
                             <?php endif; ?>
-                            <p class="font-black text-lg text-slate-900 mt-1"><?= number_format($item['price'], 2, ',', ' ') ?> €</p>
+                            <p class="font-black text-lg text-slate-900 mt-1">
+                                <?= number_format($item['price'], 2, ',', ' ') ?>
+                                <?php
+                                    echo \App\Utils\FormatUtils::getCurrencySymbol($item['currency']);
+                                ?>
+                            </p>
                         </div>
                     </div>
 
@@ -109,8 +114,15 @@
                 </div>
                 <div class="grid grid-cols-2 gap-8">
                     <div>
-                        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Prix (€)</label>
-                        <input type="number" step="0.01" x-model="form.price" class="w-full border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-lg bg-transparent">
+                        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Prix</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" step="0.01" x-model="form.price" class="flex-grow border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-lg bg-transparent">
+                            <select x-model="form.currency" class="border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold bg-transparent cursor-pointer">
+                                <option value="EUR">€</option>
+                                <option value="USD">$</option>
+                                <option value="GBP">£</option>
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Priorité</label>

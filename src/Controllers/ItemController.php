@@ -33,8 +33,8 @@ class ItemController {
             $maxPos = (int)$posStmt->fetchColumn();
 
             $stmt = $db->prepare("INSERT INTO items (
-                list_id, title, description, image_url, url, price, priority, category, position
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                list_id, title, description, image_url, url, price, currency, priority, category, position
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $stmt->execute([
                 $input['list_id'],
@@ -43,6 +43,7 @@ class ItemController {
                 $input['image_url'] ?? '',
                 UrlUtils::cleanAmazonUrl($input['url'] ?? ''),
                 (float)($input['price'] ?? 0),
+                $input['currency'] ?? 'EUR',
                 (int)($input['priority'] ?? 1),
                 $category,
                 $maxPos + 1
@@ -142,12 +143,13 @@ class ItemController {
         try {
             $db = \App\Utils\Database::getConnection();
             $stmt = $db->prepare("UPDATE items SET 
-                title = ?, price = ?, priority = ?, category = ?, description = ?, image_url = ?, url = ?
+                title = ?, price = ?, currency = ?, priority = ?, category = ?, description = ?, image_url = ?, url = ?
                 WHERE id = ?");
             
             $stmt->execute([
                 $input['title'],
                 (float)$input['price'],
+                $input['currency'] ?? 'EUR',
                 (int)$input['priority'],
                 $category,
                 $input['description'] ?? '',

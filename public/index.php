@@ -52,6 +52,7 @@ function addGiftForm() {
             url: "",
             title: "",
             price: "",
+            currency: "EUR",
             category: "",
             image_url: "",
             description: ""
@@ -79,6 +80,7 @@ function addGiftForm() {
 
                         this.form.title = data.title || this.form.title;
                         this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
+                        this.form.currency = (data.price && data.price.currency) ? data.price.currency : this.form.currency;
                         this.form.description = data.description || this.form.description;
 
                         if (data.images && data.images.length > 0) {

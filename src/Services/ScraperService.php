@@ -144,9 +144,6 @@ class ScraperService {
                 $priceData['amount'] = $ldData['price'];
                 $priceData['currency'] = $ldData['currency'] ?: $priceData['currency'];
             }
-            
-            // Conversion de devise si nécessaire
-            $finalPrice = $this->convertToEur($priceData['amount'], $priceData['currency']);
 
             $amazonImages = $this->extractAmazonImages($html);
             $amazonTitle = $this->extractAmazonTitle($html);
@@ -191,8 +188,8 @@ class ScraperService {
                 'images'      => $images,         // Toutes les images candidates
                 'url'         => $url,
                 'price'       => [
-                    'amount'   => $finalPrice > 0 ? round($finalPrice, 2) : '',
-                    'currency' => 'EUR'
+                    'amount'   => $priceData['amount'] > 0 ? round($priceData['amount'], 2) : '',
+                    'currency' => $priceData['currency'] ?: 'EUR'
                 ]
             ];
 
@@ -274,31 +271,6 @@ class ScraperService {
         if (str_contains($html, 'currencyCode&quot;:&quot;GBP&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;£&quot;')) return 'GBP';
 
         return 'EUR';
-    }
-
-    private function convertToEur($amount, $currency) {
-        if ($currency === 'EUR' || $amount <= 0) return $amount;
-
-        try {
-            $response = $this->client->get("https://api.frankfurter.app/latest", [
-                'query' => [
-                    'amount' => $amount,
-                    'from' => $currency,
-                    'to' => 'EUR'
-                ],
-                'timeout' => 5
-            ]);
-
-            if ($response->getStatusCode() === 200) {
-                $data = json_decode((string)$response->getBody(), true);
-                return round($data['rates']['EUR'], 2);
-            }
-        } catch (\Exception $e) {
-            // En cas d'échec de l'API de conversion, on garde le montant original
-            return $amount;
-        }
-        
-        return $amount;
     }
 
     private function extractAmazonImages($html) {
