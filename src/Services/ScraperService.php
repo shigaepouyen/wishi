@@ -144,9 +144,6 @@ class ScraperService {
                 $priceData['amount'] = $ldData['price'];
                 $priceData['currency'] = $ldData['currency'] ?: $priceData['currency'];
             }
-            
-            // Conversion de devise si nécessaire
-            $finalPrice = $this->convertToEur($priceData['amount'], $priceData['currency']);
 
             $amazonImages = $this->extractAmazonImages($html);
             $amazonTitle = $this->extractAmazonTitle($html);
@@ -191,8 +188,8 @@ class ScraperService {
                 'images'      => $images,         // Toutes les images candidates
                 'url'         => $url,
                 'price'       => [
-                    'amount'   => $finalPrice > 0 ? $finalPrice : '',
-                    'currency' => 'EUR'
+                    'amount'   => $priceData['amount'] > 0 ? round($priceData['amount'], 2) : '',
+                    'currency' => $priceData['currency'] ?: 'EUR'
                 ]
             ];
 
@@ -202,18 +199,22 @@ class ScraperService {
     }
 
     protected function extractPrice($html) {
+        // STRATÉGIE 0 : Nettoyage préalable pour éviter de matcher les publicités sponsorisées
+        // On retire temporairement les blocs de feedback publicitaire pour l'extraction du prix
+        $cleanHtml = preg_replace('/data-adfeedbackdetails=["\'].*?["\']/is', '', $html);
+
         // STRATÉGIE 1 : Patterns JSON e-commerce (Amazon, AliExpress, etc.)
         $jsonPatterns = [
+            '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/',   // Amazon inputs (Priorité car spécifique au produit principal)
             '/"priceAmount":\s*([0-9.]+)/',                          // Amazon
             '/"price":\s*\{[^}]*?"amount":\s*([0-9.]+)/i',           // AliExpress v1
             '/"price":\s*"([0-9.]+)"/i',                            // Schema.org simple string
             '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
             '/"minPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v3
-            '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/'    // Amazon inputs
         ];
 
         foreach ($jsonPatterns as $pattern) {
-            if (preg_match($pattern, $html, $matches)) {
+            if (preg_match($pattern, $cleanHtml, $matches)) {
                 $val = str_replace([' ', ','], ['', '.'], $matches[1]);
                 $val = preg_replace('/[^0-9.]/', '', $val);
                 return [
@@ -224,7 +225,7 @@ class ScraperService {
         }
 
         // STRATÉGIE 2 : Meta tags spécifiques au prix
-        if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $html, $matches)) {
+        if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $cleanHtml, $matches)) {
             return [
                 'amount' => floatval($matches[1]),
                 'currency' => $this->detectCurrency($html)
@@ -259,36 +260,17 @@ class ScraperService {
     }
 
     private function detectCurrency($html) {
-        // On check les indices dans le code source global
-        if (str_contains($html, '"currencySymbol":"€"') || str_contains($html, 'currencyCode":"EUR"')) return 'EUR';
-        if (str_contains($html, '"currencySymbol":"$"') || str_contains($html, 'currencyCode":"USD"')) return 'USD';
-        if (str_contains($html, '"currencySymbol":"£"') || str_contains($html, 'currencyCode":"GBP"')) return 'GBP';
+        // On check les indices dans le code source global avec support des guillemets encodés
+        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
+        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?USD["\']?/i', $html) || str_contains($html, '$')) return 'USD';
+        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?GBP["\']?/i', $html) || str_contains($html, '£')) return 'GBP';
+
+        // Support pour les formats &quot;
+        if (str_contains($html, 'currencyCode&quot;:&quot;EUR&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;€&quot;')) return 'EUR';
+        if (str_contains($html, 'currencyCode&quot;:&quot;USD&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;$&quot;')) return 'USD';
+        if (str_contains($html, 'currencyCode&quot;:&quot;GBP&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;£&quot;')) return 'GBP';
+
         return 'EUR';
-    }
-
-    private function convertToEur($amount, $currency) {
-        if ($currency === 'EUR' || $amount <= 0) return $amount;
-
-        try {
-            $response = $this->client->get("https://api.frankfurter.app/latest", [
-                'query' => [
-                    'amount' => $amount,
-                    'from' => $currency,
-                    'to' => 'EUR'
-                ],
-                'timeout' => 5
-            ]);
-
-            if ($response->getStatusCode() === 200) {
-                $data = json_decode((string)$response->getBody(), true);
-                return round($data['rates']['EUR'], 2);
-            }
-        } catch (\Exception $e) {
-            // En cas d'échec de l'API de conversion, on garde le montant original
-            return $amount;
-        }
-        
-        return $amount;
     }
 
     private function extractAmazonImages($html) {

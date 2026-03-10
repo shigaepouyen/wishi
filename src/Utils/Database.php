@@ -42,6 +42,15 @@ class Database {
                 if (!$hasEmail) {
                     self::$instance->exec("ALTER TABLE items ADD COLUMN donor_email TEXT;");
                 }
+
+                // Migration : assure l'existence de la colonne 'currency'
+                $hasCurrency = false;
+                foreach ($columns as $col) {
+                    if ($col['name'] === 'currency') $hasCurrency = true;
+                }
+                if (!$hasCurrency) {
+                    self::$instance->exec("ALTER TABLE items ADD COLUMN currency TEXT DEFAULT 'EUR';");
+                }
             } catch (\Exception $e) {}
         }
         return self::$instance;
