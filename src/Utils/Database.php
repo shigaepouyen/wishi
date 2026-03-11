@@ -42,6 +42,20 @@ class Database {
                 if (!$hasEmail) {
                     self::$instance->exec("ALTER TABLE items ADD COLUMN donor_email TEXT;");
                 }
+
+                // Migration : assure l'existence de la colonne 'currency'
+                $hasCurrency = false;
+                $hasPriceEur = false;
+                foreach ($columns as $col) {
+                    if ($col['name'] === 'currency') $hasCurrency = true;
+                    if ($col['name'] === 'price_eur') $hasPriceEur = true;
+                }
+                if (!$hasCurrency) {
+                    self::$instance->exec("ALTER TABLE items ADD COLUMN currency TEXT DEFAULT 'EUR';");
+                }
+                if (!$hasPriceEur) {
+                    self::$instance->exec("ALTER TABLE items ADD COLUMN price_eur REAL;");
+                }
             } catch (\Exception $e) {}
         }
         return self::$instance;
@@ -80,6 +94,7 @@ class Database {
             url TEXT,
             price REAL,
             currency TEXT DEFAULT 'EUR',
+            price_eur REAL,
             category TEXT,
             priority INTEGER DEFAULT 1,
             position INTEGER DEFAULT 0,

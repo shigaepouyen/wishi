@@ -32,9 +32,13 @@ class ItemController {
             $posStmt->execute([$input['list_id']]);
             $maxPos = (int)$posStmt->fetchColumn();
 
+            $price = (float)($input['price'] ?? 0);
+            $currency = $input['currency'] ?? 'EUR';
+            $priceEur = (float)($input['price_eur'] ?? ($currency === 'EUR' ? $price : \App\Utils\CurrencyUtils::convertToEur($price, $currency)));
+
             $stmt = $db->prepare("INSERT INTO items (
-                list_id, title, description, image_url, url, price, priority, category, position
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                list_id, title, description, image_url, url, price, currency, price_eur, priority, category, position
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $stmt->execute([
                 $input['list_id'],
@@ -42,7 +46,9 @@ class ItemController {
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
                 UrlUtils::cleanAmazonUrl($input['url'] ?? ''),
-                (float)($input['price'] ?? 0),
+                $price,
+                $currency,
+                $priceEur,
                 (int)($input['priority'] ?? 1),
                 $category,
                 $maxPos + 1
@@ -141,13 +147,20 @@ class ItemController {
 
         try {
             $db = \App\Utils\Database::getConnection();
+
+            $price = (float)($input['price'] ?? 0);
+            $currency = $input['currency'] ?? 'EUR';
+            $priceEur = (float)($input['price_eur'] ?? ($currency === 'EUR' ? $price : \App\Utils\CurrencyUtils::convertToEur($price, $currency)));
+
             $stmt = $db->prepare("UPDATE items SET 
-                title = ?, price = ?, priority = ?, category = ?, description = ?, image_url = ?, url = ?
+                title = ?, price = ?, currency = ?, price_eur = ?, priority = ?, category = ?, description = ?, image_url = ?, url = ?
                 WHERE id = ?");
             
             $stmt->execute([
                 $input['title'],
-                (float)$input['price'],
+                $price,
+                $currency,
+                $priceEur,
                 (int)$input['priority'],
                 $category,
                 $input['description'] ?? '',

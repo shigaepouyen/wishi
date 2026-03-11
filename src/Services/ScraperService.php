@@ -34,31 +34,38 @@ class ScraperService {
         ]);
     }
 
-    public function getLinkData(string $url) {
+    public function getLinkData(string $url, ?string $html = null) {
         try {
-            // Pour AliExpress on évite le Referer google qui peut déclencher des redirections infinies
-            $headers = [];
-            if (!str_contains($url, 'aliexpress.com')) {
-                $headers['Referer'] = 'https://www.google.com/';
+            $statusCode = 200;
+            $response = null;
+
+            if ($html === null) {
+                // Pour AliExpress on évite le Referer google qui peut déclencher des redirections infinies
+                $headers = [];
+                if (!str_contains($url, 'aliexpress.com')) {
+                    $headers['Referer'] = 'https://www.google.com/';
+                }
+
+                $response = $this->client->get($url, [
+                    'headers' => $headers,
+                    'http_errors' => false
+                ]);
+
+                $statusCode = $response->getStatusCode();
+                // On récupère l'URL finale (après éventuelles redirections, important pour amzn.to)
+                $finalUrl = $url;
+                if ($response->hasHeader('X-GUZZLE-REDIRECT-HISTORY')) {
+                    $history = $response->getHeader('X-GUZZLE-REDIRECT-HISTORY');
+                    $finalUrl = end($history);
+                }
+
+                // Nettoyage de l'URL Amazon
+                $url = UrlUtils::cleanAmazonUrl($finalUrl);
+
+                $html = (string)$response->getBody();
+            } else {
+                $url = UrlUtils::cleanAmazonUrl($url);
             }
-
-            $response = $this->client->get($url, [
-                'headers' => $headers,
-                'http_errors' => false
-            ]);
-
-            $statusCode = $response->getStatusCode();
-            // On récupère l'URL finale (après éventuelles redirections, important pour amzn.to)
-            $finalUrl = $url;
-            if ($response->hasHeader('X-GUZZLE-REDIRECT-HISTORY')) {
-                $history = $response->getHeader('X-GUZZLE-REDIRECT-HISTORY');
-                $finalUrl = end($history);
-            }
-
-            // Nettoyage de l'URL Amazon
-            $url = UrlUtils::cleanAmazonUrl($finalUrl);
-
-            $html = (string)$response->getBody();
 
             // Extraction OpenGraph précoce (souvent présent même sur les pages de redirection/captcha)
             $ogData = $this->extractOpenGraphData($html);
@@ -82,20 +89,29 @@ class ScraperService {
                  throw new \Exception("Le site a bloqué la requête (Captcha détecté).");
             }
 
-            $embed = new Embed();
-            try {
-                // Pour éviter un second appel réseau bloqué, on passe directement la réponse Guzzle à Embed
-                $uri = $embed->getCrawler()->createUri($url);
-                $request = $embed->getCrawler()->createRequest('GET', $uri);
-                $info = $embed->getExtractorFactory()->createExtractor($uri, $request, $response, $embed->getCrawler());
+            $title = '';
+            $description = '';
+            $image = '';
 
-                $title = $info->title;
-                $description = $info->description;
-                $image = (string)$info->image;
-            } catch (\Exception $e) {
-                $title = $ogData['title'] ?? '';
-                $description = $ogData['description'] ?? '';
-                $image = $ogData['image'] ?? '';
+            if ($response) {
+                $embed = new Embed();
+                try {
+                    // Pour éviter un second appel réseau bloqué, on passe directement la réponse Guzzle à Embed
+                    $uri = $embed->getCrawler()->createUri($url);
+                    $request = $embed->getCrawler()->createRequest('GET', $uri);
+                    $info = $embed->getExtractorFactory()->createExtractor($uri, $request, $response, $embed->getCrawler());
+
+                    $title = $info->title;
+                    $description = $info->description;
+                    $image = (string)$info->image;
+                } catch (\Exception $e) {
+                    // Les fallbacks seront gérés après
+                }
+            } elseif ($html) {
+                // Fallback minimaliste si on a juste du HTML (pour les tests)
+                if (preg_match('/<title>(.*?)<\/title>/is', $html, $matches)) {
+                    $title = html_entity_decode(trim($matches[1]));
+                }
             }
 
             // Fallbacks robustes via OpenGraph si Embed a échoué
@@ -144,9 +160,6 @@ class ScraperService {
                 $priceData['amount'] = $ldData['price'];
                 $priceData['currency'] = $ldData['currency'] ?: $priceData['currency'];
             }
-            
-            // Conversion de devise si nécessaire
-            $finalPrice = $this->convertToEur($priceData['amount'], $priceData['currency']);
 
             $amazonImages = $this->extractAmazonImages($html);
             $amazonTitle = $this->extractAmazonTitle($html);
@@ -184,6 +197,11 @@ class ScraperService {
                 return 0;
             });
 
+            $amountEur = $priceData['amount'];
+            if ($priceData['currency'] !== 'EUR' && $priceData['amount'] > 0) {
+                $amountEur = $this->convertToEur($priceData['amount'], $priceData['currency']);
+            }
+
             return [
                 'title'       => $amazonTitle ?: (($title && $title !== 'Sans titre') ? $title : ''),
                 'description' => $description ?: '',
@@ -191,8 +209,9 @@ class ScraperService {
                 'images'      => $images,         // Toutes les images candidates
                 'url'         => $url,
                 'price'       => [
-                    'amount'   => $finalPrice > 0 ? $finalPrice : '',
-                    'currency' => 'EUR'
+                    'amount'     => $priceData['amount'] > 0 ? round($priceData['amount'], 2) : '',
+                    'currency'   => $priceData['currency'] ?: 'EUR',
+                    'amount_eur' => $amountEur > 0 ? round($amountEur, 2) : ''
                 ]
             ];
 
@@ -202,18 +221,22 @@ class ScraperService {
     }
 
     protected function extractPrice($html) {
+        // STRATÉGIE 0 : Nettoyage préalable pour éviter de matcher les publicités sponsorisées
+        // On retire temporairement les blocs de feedback publicitaire pour l'extraction du prix
+        $cleanHtml = preg_replace('/data-adfeedbackdetails=["\'].*?["\']/is', '', $html);
+
         // STRATÉGIE 1 : Patterns JSON e-commerce (Amazon, AliExpress, etc.)
         $jsonPatterns = [
+            '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/',   // Amazon inputs (Priorité car spécifique au produit principal)
             '/"priceAmount":\s*([0-9.]+)/',                          // Amazon
             '/"price":\s*\{[^}]*?"amount":\s*([0-9.]+)/i',           // AliExpress v1
             '/"price":\s*"([0-9.]+)"/i',                            // Schema.org simple string
             '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
             '/"minPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v3
-            '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/'    // Amazon inputs
         ];
 
         foreach ($jsonPatterns as $pattern) {
-            if (preg_match($pattern, $html, $matches)) {
+            if (preg_match($pattern, $cleanHtml, $matches)) {
                 $val = str_replace([' ', ','], ['', '.'], $matches[1]);
                 $val = preg_replace('/[^0-9.]/', '', $val);
                 return [
@@ -224,7 +247,7 @@ class ScraperService {
         }
 
         // STRATÉGIE 2 : Meta tags spécifiques au prix
-        if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $html, $matches)) {
+        if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $cleanHtml, $matches)) {
             return [
                 'amount' => floatval($matches[1]),
                 'currency' => $this->detectCurrency($html)
@@ -259,36 +282,33 @@ class ScraperService {
     }
 
     private function detectCurrency($html) {
-        // On check les indices dans le code source global
-        if (str_contains($html, '"currencySymbol":"€"') || str_contains($html, 'currencyCode":"EUR"')) return 'EUR';
-        if (str_contains($html, '"currencySymbol":"$"') || str_contains($html, 'currencyCode":"USD"')) return 'USD';
-        if (str_contains($html, '"currencySymbol":"£"') || str_contains($html, 'currencyCode":"GBP"')) return 'GBP';
+        // On check les indices dans le code source global avec support des guillemets encodés
+        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
+        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?USD["\']?/i', $html) || str_contains($html, '$')) return 'USD';
+        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?GBP["\']?/i', $html) || str_contains($html, '£')) return 'GBP';
+
+        // Support pour les formats &quot;
+        if (str_contains($html, 'currencyCode&quot;:&quot;EUR&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;€&quot;')) return 'EUR';
+        if (str_contains($html, 'currencyCode&quot;:&quot;USD&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;$&quot;')) return 'USD';
+        if (str_contains($html, 'currencyCode&quot;:&quot;GBP&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;£&quot;')) return 'GBP';
+
         return 'EUR';
     }
 
-    private function convertToEur($amount, $currency) {
-        if ($currency === 'EUR' || $amount <= 0) return $amount;
+    private function convertToEur($amount, $fromCurrency) {
+        if ($fromCurrency === 'EUR') return $amount;
 
         try {
-            $response = $this->client->get("https://api.frankfurter.app/latest", [
-                'query' => [
-                    'amount' => $amount,
-                    'from' => $currency,
-                    'to' => 'EUR'
-                ],
+            $response = $this->client->get("https://api.frankfurter.app/latest?amount=$amount&from=$fromCurrency&to=EUR", [
                 'timeout' => 5
             ]);
-
-            if ($response->getStatusCode() === 200) {
-                $data = json_decode((string)$response->getBody(), true);
-                return round($data['rates']['EUR'], 2);
-            }
+            $data = json_decode($response->getBody(), true);
+            return $data['rates']['EUR'] ?? $amount;
         } catch (\Exception $e) {
-            // En cas d'échec de l'API de conversion, on garde le montant original
-            return $amount;
+            // Fallback simple si l'API est down
+            $rates = ['USD' => 0.92, 'GBP' => 1.17];
+            return $amount * ($rates[$fromCurrency] ?? 1);
         }
-        
-        return $amount;
     }
 
     private function extractAmazonImages($html) {
@@ -356,10 +376,12 @@ class ScraperService {
 
                 foreach ($items as $item) {
                     $type = $item['@type'] ?? '';
+                    $name = $item['name'] ?? '';
                     $isProduct = str_contains($type, 'Product') || $type === 'Offer';
 
-                    if ($isProduct) {
-                        $data['title'] = $item['name'] ?? $data['title'];
+                    // On ignore les produits sponsorisés dans le JSON-LD
+                    if ($isProduct && !str_contains(strtolower($name), 'sponsorisé') && !str_contains(strtolower($name), 'sponsored')) {
+                        $data['title'] = $name ?: $data['title'];
                         $data['description'] = $item['description'] ?? $data['description'];
                         if (isset($item['image'])) {
                             $data['image'] = is_array($item['image']) ? ($item['image'][0] ?? $data['image']) : $item['image'];

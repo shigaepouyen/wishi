@@ -70,7 +70,10 @@ function adminList() {
         },
 
         editItem(item) {
-            this.form = {...item};
+            this.form = {
+                currency: "EUR", // Default fallback
+                ...item
+            };
             this.images = item.image_url ? [item.image_url] : [];
             this.currentImageIndex = 0;
             this.loading = false;
@@ -100,6 +103,8 @@ function adminList() {
                         if (data.url) this.form.url = data.url;
                         this.form.title = data.title || this.form.title;
                         this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
+                        this.form.currency = (data.price && data.price.currency) ? data.price.currency : this.form.currency;
+                        this.form.price_eur = (data.price && data.price.amount_eur) ? data.price.amount_eur : this.form.price_eur;
                         this.form.description = data.description || this.form.description;
 
                         if (data.images && data.images.length > 0) {
