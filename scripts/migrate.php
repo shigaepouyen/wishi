@@ -35,6 +35,8 @@ try {
         list_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         price DECIMAL(10, 2),
+        currency TEXT DEFAULT 'EUR',
+        price_eur REAL,
         url TEXT,
         image_url TEXT,
         description TEXT,
@@ -43,6 +45,7 @@ try {
         position INTEGER DEFAULT 0,
         is_taken INTEGER DEFAULT 0,
         taken_by TEXT,
+        donor_email TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
     );";

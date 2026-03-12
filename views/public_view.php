@@ -77,9 +77,8 @@
                                 <p class="text-[11px] text-slate-500 mt-1.5 leading-snug line-clamp-3"><?= nl2br(htmlspecialchars($item['description'])) ?></p>
                             <?php endif; ?>
                             <p class="font-black text-xl mt-2 text-slate-900 tracking-tight">
-                                <?= number_format($item['price'], 2, ',', ' ') ?>
                                 <?php
-                                    echo \App\Utils\FormatUtils::getCurrencySymbol($item['currency']);
+                                    echo \App\Utils\FormatUtils::formatDualPrice($item['price'], $item['currency'], $item['price_eur']);
                                 ?>
                             </p>
                         </div>

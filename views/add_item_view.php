@@ -81,6 +81,12 @@
                                     <option value="GBP">£ (GBP)</option>
                                 </select>
                             </div>
+                            <!-- Conversion indicative -->
+                            <template x-if="form.currency !== 'EUR' && form.price > 0">
+                                <div class="mt-2 text-[10px] text-slate-400 font-medium">
+                                    Estimation : <span class="text-<?= $color ?>-600 font-bold" x-text="indicativePriceEur"></span> <span class="text-<?= $color ?>-600 font-bold">€</span>
+                                </div>
+                            </template>
                         </div>
                         <div>
                             <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Catégorie</label>
