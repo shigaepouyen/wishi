@@ -29,7 +29,7 @@ $currentCat = $data['currentCategory'] ?? '';
 
 $title = "Wishi - " . htmlspecialchars($list['name']) . " (Admin)";
 $body_class = "bg-$color-50/30";
-$body_attrs = 'x-data="adminList()" x-init="initSortable()"';
+$body_attrs = 'x-data="adminList()" x-init="init()"';
 $extra_css = '
     .truncate-2-lines { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -48,11 +48,25 @@ function adminList() {
         images: [],
         currentImageIndex: 0,
         itemToDelete: null,
+        rates: {},
         form: {},
         listSettings: ' . json_encode([
             'id' => $list['id'],
             'name' => $list['name']
         ]) . ',
+
+        async init() {
+            try {
+                const res = await fetch("api/rates.php");
+                const data = await res.json();
+                if (data.success) {
+                    this.rates = data.rates;
+                }
+            } catch (e) {
+                console.error("Erreur lors de la récupération des taux de change");
+            }
+            this.initSortable();
+        },
 
         initSortable() {
             const el = document.getElementById("items-grid");
@@ -88,6 +102,12 @@ function adminList() {
         prevImage() {
             this.currentImageIndex = (this.currentImageIndex - 1 + this.images.length) % this.images.length;
             this.form.image_url = this.images[this.currentImageIndex];
+        },
+
+        get indicativePriceEur() {
+            if (this.form.currency === "EUR") return this.form.price;
+            if (!this.form.price || !this.rates[this.form.currency]) return "0.00";
+            return (this.form.price / this.rates[this.form.currency]).toFixed(2);
         },
 
         async scrapeUrl() {

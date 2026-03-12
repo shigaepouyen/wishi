@@ -82,10 +82,9 @@
                             <?php if (!empty($item['description'])): ?>
                                 <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2 italic"><?= htmlspecialchars($item['description']) ?></p>
                             <?php endif; ?>
-                            <p class="font-black text-lg text-slate-900 mt-1">
-                                <?= number_format($item['price'], 2, ',', ' ') ?>
+                            <p class="text-slate-900 mt-1">
                                 <?php
-                                    echo \App\Utils\FormatUtils::getCurrencySymbol($item['currency']);
+                                    echo \App\Utils\FormatUtils::formatDualPrice($item['price'], $item['currency'], $item['price_eur']);
                                 ?>
                             </p>
                         </div>
@@ -123,6 +122,11 @@
                                 <option value="GBP">£</option>
                             </select>
                         </div>
+                        <template x-if="form.currency !== 'EUR' && form.price > 0">
+                            <div class="mt-1 text-[9px] text-slate-400 font-medium">
+                                Estimation : <span class="text-<?= $color ?>-600 font-bold" x-text="indicativePriceEur"></span> <span class="text-<?= $color ?>-600 font-bold">€</span>
+                            </div>
+                        </template>
                     </div>
                     <div>
                         <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Priorité</label>
