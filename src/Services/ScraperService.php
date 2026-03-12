@@ -200,8 +200,7 @@ class ScraperService {
 
     protected function extractPrice($html) {
         // STRATÉGIE 0 : Nettoyage préalable pour éviter de matcher les publicités sponsorisées
-        // On retire temporairement les blocs de feedback publicitaire pour l'extraction du prix
-        $cleanHtml = preg_replace('/data-adfeedbackdetails=["\'].*?["\']/is', '', $html);
+        $cleanHtml = $this->cleanHtml($html);
 
         // STRATÉGIE 1 : Patterns JSON e-commerce (Amazon, AliExpress, etc.)
         $jsonPatterns = [
@@ -337,6 +336,12 @@ class ScraperService {
                 $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : (isset($jsonData[0]) ? $jsonData : [$jsonData]);
 
                 foreach ($items as $item) {
+                    // On ignore les produits sponsorisés dans le JSON-LD
+                    $itemString = json_encode($item);
+                    if (str_contains(strtolower($itemString), 'sponsored') || str_contains(strtolower($itemString), 'sponsorisé')) {
+                        continue;
+                    }
+
                     $type = $item['@type'] ?? '';
                     $isProduct = str_contains($type, 'Product') || $type === 'Offer';
 
@@ -370,6 +375,24 @@ class ScraperService {
             }
         }
         return $data;
+    }
+
+    private function cleanHtml(string $html): string {
+        // Supprime les blocs sponsorisés Amazon connus qui polluent l'extraction du prix
+        $patterns = [
+            // Blocs Sponsored Products (Carrousels) - se terminent généralement par a-end
+            '/<div[^>]*id="sp_detail\d?"[^>]*>.*?<span class="a-end aok-hidden"><\/span>.*?<\/div>/is',
+            // Blocs APE (Amazon Placement Engine)
+            '/<div[^>]*id="ape_Detail[^>]*>.*?<\/div>\s*<\/div>/is',
+            // Attributs de feedback publicitaire (contiennent souvent des prix bruts en JSON)
+            '/data-adfeedbackdetails=["\'].*?["\']/is',
+        ];
+
+        foreach ($patterns as $pattern) {
+            $html = preg_replace($pattern, '', $html);
+        }
+
+        return $html;
     }
 
     private function extractOpenGraphData($html) {

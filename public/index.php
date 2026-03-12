@@ -45,6 +45,7 @@ function addGiftForm() {
     return {
         loading: false,
         submitting: false,
+        rates: {},
         images: [],
         currentImageIndex: 0,
         form: {
@@ -56,6 +57,22 @@ function addGiftForm() {
             category: "",
             image_url: "",
             description: ""
+        },
+        get indicativePriceEur() {
+            if (this.form.currency === "EUR") return this.form.price;
+            if (!this.form.price || !this.rates[this.form.currency]) return "0.00";
+            return (this.form.price / this.rates[this.form.currency]).toFixed(2);
+        },
+        async init() {
+            try {
+                const res = await fetch("api/rates.php");
+                const data = await res.json();
+                if (data.success) {
+                    this.rates = data.rates;
+                }
+            } catch (e) {
+                console.error("Erreur lors de la récupération des taux de change");
+            }
         },
         nextImage() {
             this.currentImageIndex = (this.currentImageIndex + 1) % this.images.length;

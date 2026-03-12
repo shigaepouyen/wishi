@@ -6,6 +6,7 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use App\Services\ScraperService;
+use App\Utils\CurrencyUtils;
 
 header('Content-Type: application/json');
 
@@ -27,6 +28,11 @@ try {
             'error' => $data['error']
         ]);
     } else {
+        // Ajout d'une estimation indicative en euros pour l'affichage temps réel
+        if (isset($data['price']['amount']) && $data['price']['amount'] > 0) {
+            $data['price']['indicative_eur'] = CurrencyUtils::convertToEur($data['price']['amount'], $data['price']['currency']);
+        }
+
         // On vérifie qu'on n'a pas un résultat vide/générique (site qui bloque silencieusement)
         $isGeneric = ($data['title'] === 'Sans titre' && empty($data['description']) && empty($data['image']));
 
