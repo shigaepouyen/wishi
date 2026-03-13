@@ -33,7 +33,7 @@ try {
     // 3. On garde un token pour le slug_admin (plus sûr pour gérer la liste)
     $slug_admin = bin2hex(random_bytes(16));
 
-    $stmt = $db->prepare("INSERT INTO lists (profile_id, name, slug_admin, slug_public) VALUES (?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO lists (profile_id, name, slug_admin, slug_public, is_surprise) VALUES (?, ?, ?, ?, 1)");
     $stmt->execute([$profile_id, $name, $slug_admin, $slug_public]);
 
     echo json_encode(['success' => true]);

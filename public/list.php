@@ -52,7 +52,8 @@ function adminList() {
         form: {},
         listSettings: ' . json_encode([
             'id' => $list['id'],
-            'name' => $list['name']
+            'name' => $list['name'],
+            'is_surprise' => $list['is_surprise'] == 1
         ]) . ',
 
         async init() {

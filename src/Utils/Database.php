@@ -56,6 +56,16 @@ class Database {
                 if (!$hasPriceEur) {
                     self::$instance->exec("ALTER TABLE items ADD COLUMN price_eur REAL;");
                 }
+
+                // Migration : assure l'existence de la colonne 'is_surprise' dans 'lists'
+                $listColumns = self::$instance->query("PRAGMA table_info(lists)")->fetchAll();
+                $hasIsSurprise = false;
+                foreach ($listColumns as $col) {
+                    if ($col['name'] === 'is_surprise') $hasIsSurprise = true;
+                }
+                if (!$hasIsSurprise) {
+                    self::$instance->exec("ALTER TABLE lists ADD COLUMN is_surprise INTEGER DEFAULT 1;");
+                }
             } catch (\Exception $e) {}
         }
         return self::$instance;
@@ -80,6 +90,7 @@ class Database {
             name TEXT NOT NULL,
             slug_admin TEXT UNIQUE NOT NULL,
             slug_public TEXT UNIQUE NOT NULL,
+            is_surprise INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
         )");

@@ -67,8 +67,10 @@
                         <div class="flex items-center cursor-move text-slate-200 hover:text-<?= $color ?>-500 transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
                         </div>
-                        <?php if ($item['is_taken']): ?>
-                            <span class="bg-green-50 text-green-600 text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">Réservé</span>
+                        <?php if ($item['is_taken'] && !$list['is_surprise']): ?>
+                            <span class="bg-green-50 text-green-600 text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                Réservé par <?= htmlspecialchars($item['taken_by'] ?: 'Quelqu\'un') ?>
+                            </span>
                         <?php endif; ?>
                     </div>
 
@@ -248,6 +250,24 @@
                     <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Titre de l'événement</label>
                     <input type="text" x-model="listSettings.name" class="w-full border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-lg bg-transparent">
                 </div>
+
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
+                    <div>
+                        <label class="text-sm font-bold text-slate-800">Mode Surprise 🎁</label>
+                        <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest leading-tight">Masquer les réservations sur cet écran</p>
+                    </div>
+                    <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" x-model="listSettings.is_surprise"
+                               class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 z-10"/>
+                        <label class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+
+                <style>
+                    .toggle-checkbox:checked { right: 0; border-color: #1e293b; }
+                    .toggle-checkbox:checked + .toggle-label { background-color: #1e293b; }
+                    .toggle-checkbox { right: 16px; transition: all 0.3s; }
+                </style>
 
                 <div class="grid grid-cols-2 gap-4">
                     <button @click="resetReservations()" class="py-2.5 px-4 rounded-xl bg-slate-50 text-slate-600 text-[10px] font-bold uppercase tracking-wider hover:bg-slate-100 transition-all">
