@@ -16,11 +16,38 @@ class ItemController {
         return mb_convert_case($category, MB_CASE_TITLE, "UTF-8");
     }
 
+    /**
+     * Vérifie si une URL existe déjà dans une liste donnée.
+     */
+    public function isDuplicate(int $listId, string $url, ?int $excludeId = null): bool {
+        if (empty($url)) return false;
+
+        $url = UrlUtils::cleanAmazonUrl($url);
+        $db = Database::getConnection();
+
+        $query = "SELECT COUNT(*) FROM items WHERE list_id = ? AND url = ?";
+        $params = [$listId, $url];
+
+        if ($excludeId) {
+            $query .= " AND id != ?";
+            $params[] = $excludeId;
+        }
+
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
     public function save() {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!$input || !isset($input['title']) || !isset($input['list_id'])) {
             return json_encode(['error' => 'Données invalides']);
+        }
+
+        $url = $input['url'] ?? '';
+        if (!empty($url) && $this->isDuplicate((int)$input['list_id'], $url)) {
+            return json_encode(['error' => 'Ce lien existe déjà dans votre liste.']);
         }
 
         $category = $this->normalizeCategory($input['category'] ?? null);
@@ -144,11 +171,24 @@ class ItemController {
 
         if (!$id) return json_encode(['error' => 'ID manquant']);
 
-        $category = $this->normalizeCategory($input['category'] ?? null);
+        $url = $input['url'] ?? '';
 
         try {
             $db = Database::getConnection();
 
+            // On doit retrouver le list_id pour l'item actuel si non fourni
+            $listId = $input['list_id'] ?? null;
+            if (!$listId) {
+                $stmt = $db->prepare("SELECT list_id FROM items WHERE id = ?");
+                $stmt->execute([$id]);
+                $listId = $stmt->fetchColumn();
+            }
+
+            if (!empty($url) && $this->isDuplicate((int)$listId, $url, (int)$id)) {
+                return json_encode(['error' => 'Ce lien existe déjà dans votre liste.']);
+            }
+
+            $category = $this->normalizeCategory($input['category'] ?? null);
             $price = (float)($input['price'] ?? 0);
             $currency = $input['currency'] ?? 'EUR';
             $priceEur = CurrencyUtils::convertToEur($price, $currency);
