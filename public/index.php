@@ -86,7 +86,7 @@ function addGiftForm() {
             if (!this.form.url.startsWith("http")) return;
             this.loading = true;
             try {
-                const res = await fetch("api/scrape.php?url=" + encodeURIComponent(this.form.url));
+                const res = await fetch(`api/scrape.php?list_id=${this.form.list_id}&url=` + encodeURIComponent(this.form.url));
                 const data = await res.json();
                 if (data.success) {
                     if (data.is_generic) {
@@ -108,7 +108,11 @@ function addGiftForm() {
                             this.form.image_url = data.image || this.form.image_url;
                             this.images = this.form.image_url ? [this.form.image_url] : [];
                         }
-                        window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Informations récupérées avec succès !", type: "success" } }));
+                        if (data.is_duplicate) {
+                            window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Attention : Ce lien existe déjà dans votre liste !", type: "info" } }));
+                        } else {
+                            window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Informations récupérées avec succès !", type: "success" } }));
+                        }
                     }
                 } else if (data.error) {
                     window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : " + data.error, type: "error" } }));

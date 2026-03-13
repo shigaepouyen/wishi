@@ -12,6 +12,8 @@ header('Content-Type: application/json');
 
 // On récupère l'URL proprement
 $url = $_GET['url'] ?? null;
+$list_id = isset($_GET['list_id']) ? (int)$_GET['list_id'] : null;
+$item_id = isset($_GET['item_id']) ? (int)$_GET['item_id'] : null;
 
 if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
     echo json_encode(['error' => 'URL invalide ou absente']);
@@ -36,9 +38,16 @@ try {
         // On vérifie qu'on n'a pas un résultat vide/générique (site qui bloque silencieusement)
         $isGeneric = ($data['title'] === 'Sans titre' && empty($data['description']) && empty($data['image']));
 
+        // Détection de doublons si list_id est fourni
+        $isDuplicate = false;
+        if ($list_id) {
+            $isDuplicate = (new \App\Controllers\ItemController())->isDuplicate($list_id, $data['url'] ?? $url, $item_id);
+        }
+
         echo json_encode(array_merge([
             'success' => true,
-            'is_generic' => $isGeneric
+            'is_generic' => $isGeneric,
+            'is_duplicate' => $isDuplicate
         ], $data));
     }
 } catch (\Exception $e) {
