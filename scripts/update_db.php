@@ -29,6 +29,22 @@ try {
         echo "❌ Erreur lors de la mise à jour automatique.\n";
     }
 
+    // Vérification de is_surprise
+    $listColumns = $db->query("PRAGMA table_info(lists)")->fetchAll();
+    $hasIsSurprise = false;
+    foreach ($listColumns as $col) {
+        if ($col['name'] === 'is_surprise') {
+            $hasIsSurprise = true;
+            break;
+        }
+    }
+
+    if ($hasIsSurprise) {
+        echo "✅ La base de données est à jour (colonne 'is_surprise' présente).\n";
+    } else {
+        echo "❌ Erreur : la colonne 'is_surprise' est manquante dans 'lists'.\n";
+    }
+
 } catch (Exception $e) {
     echo "❌ Erreur : " . $e->getMessage() . "\n";
 }

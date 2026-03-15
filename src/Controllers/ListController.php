@@ -107,19 +107,31 @@ class ListController {
         $id = $input['id'] ?? null;
         $newName = $input['name'] ?? null;
         $regenSlug = $input['regen_slug'] ?? false;
+        $isSurprise = isset($input['is_surprise']) ? ($input['is_surprise'] ? 1 : 0) : null;
 
         if (!$id || !$newName) return json_encode(['error' => 'Données manquantes']);
 
         $db = \App\Utils\Database::getConnection();
         
+        $sql = "UPDATE lists SET name = ?";
+        $params = [$newName];
+
         if ($regenSlug) {
             $newSlug = bin2hex(random_bytes(8));
-            $stmt = $db->prepare("UPDATE lists SET name = ?, slug_public = ? WHERE id = ?");
-            $stmt->execute([$newName, $newSlug, $id]);
-        } else {
-            $stmt = $db->prepare("UPDATE lists SET name = ? WHERE id = ?");
-            $stmt->execute([$newName, $id]);
+            $sql .= ", slug_public = ?";
+            $params[] = $newSlug;
         }
+
+        if ($isSurprise !== null) {
+            $sql .= ", is_surprise = ?";
+            $params[] = $isSurprise;
+        }
+
+        $sql .= " WHERE id = ?";
+        $params[] = $id;
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
 
         return json_encode(['success' => true]);
     }
