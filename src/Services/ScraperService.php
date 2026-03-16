@@ -213,6 +213,10 @@ class ScraperService {
             '/"lowPrice":\s*"([^"]+)"/i',                            // Schema.org AggregateOffer
             '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
             '/"minPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v3
+            '/"formatedPrice":\s*"([^"]+)"/i',                       // AliExpress v4
+            '/"salePrice":\s*"([^"]+)"/i',                           // AliExpress v5
+            '/"priceText":\s*"([^"]+)"/i',                           // AliExpress v6
+            '/"value":\s*([0-9.]+),\s*"currency":/i',                // AliExpress v7 (Price module)
         ];
 
         foreach ($jsonPatterns as $pattern) {
