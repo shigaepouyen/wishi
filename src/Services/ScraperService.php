@@ -16,7 +16,7 @@ class ScraperService {
             'timeout' => 20,
             'cookies' => true,
             'allow_redirects' => [
-                'max' => 10,
+                'max' => 30,
                 'track_redirects' => true
             ],
             'headers' => [
@@ -28,7 +28,6 @@ class ScraperService {
                 'Upgrade-Insecure-Requests' => '1',
             ],
             'curl' => [
-                CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_AUTOREFERER => true,
             ]
         ]);
@@ -53,7 +52,11 @@ class ScraperService {
 
             $response = $this->client->get($url, [
                 'headers' => $headers,
-                'http_errors' => false
+                'http_errors' => false,
+                'curl' => [
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 30,
+                ]
             ]);
 
             $statusCode = $response->getStatusCode();
@@ -236,8 +239,16 @@ class ScraperService {
             '/"salePrice":\s*"([^"]+)"/i',                           // AliExpress v5
             '/"priceText":\s*"([^"]+)"/i',                           // AliExpress v6
             '/"value":\s*([0-9.]+),\s*"currency":/i',                // AliExpress v7 (Price module)
+            '/"actPrice":\s*"([^"]+)"/i',                            // AliExpress v8
+            '/"appPrice":\s*"([^"]+)"/i',                            // AliExpress v9
+            '/"discountPrice":\s*"([^"]+)"/i',                       // AliExpress v10
+            '/"actPriceDisplay":"([^"]+)"/i',                        // AliExpress v11
+            '/"minPrice":"([^"]+)"/i',                               // AliExpress v12
+            '/"maxPrice":"([^"]+)"/i',                               // AliExpress v13
             '/"price":\s*([0-9.]+)/i',                               // Generic JSON numeric price
             '/"price":\s*"([^"]+)"/i',                               // Generic JSON string price
+            '/"skuAmount":\s*\{[^}]*?"value":\s*([0-9.]+)/i',        // AliExpress SKU amount
+            '/"skuActivityAmount":\s*\{[^}]*?"value":\s*([0-9.]+)/i',// AliExpress SKU promo
         ];
 
         foreach ($jsonPatterns as $pattern) {
@@ -295,8 +306,9 @@ class ScraperService {
         if (preg_match('/<meta.*?property=["\']og:price:currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
         if (preg_match('/<meta.*?name=["\']currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
 
-        // STRATÉGIE 2 : Plateformes spécifiques (Shopify)
+        // STRATÉGIE 2 : Plateformes spécifiques
         if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return $m[1];
+        if (preg_match('/"currencyCode":\s*"([^"]+)"/i', $html, $m)) return $m[1]; // AliExpress/Generic JSON
         if (preg_match('/Price:\s*"([^"]*?)(?:EUR|USD|GBP|€|\$|£|[\d,.]+)"/i', $html, $m)) {
             if (str_contains($m[0], '€') || str_contains($m[0], 'EUR')) return 'EUR';
             if (str_contains($m[0], '$') || str_contains($m[0], 'USD')) return 'USD';
@@ -420,6 +432,17 @@ class ScraperService {
                         $offers = is_array($item['offers']) && !isset($item['offers']['price']) && !isset($item['offers']['lowPrice']) ? $item['offers'] : [$item['offers']];
                         foreach ($offers as $offer) {
                             // Si on a une URL cible (variante), on privilégie l'offre qui correspond
+                            // On utilise getProductId pour une comparaison robuste (AliExpress change souvent de domaine .com/.us)
+                            $targetId = $targetUrl ? $this->getProductId($targetUrl) : null;
+                            $offerUrl = $offer['url'] ?? null;
+                            $offerId = $offerUrl ? $this->getProductId($offerUrl) : null;
+
+                            if ($targetId && $offerId && $targetId === $offerId) {
+                                $data['price'] = floatval($offer['price'] ?? $offer['lowPrice'] ?? 0);
+                                $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
+                                break;
+                            }
+
                             if ($targetUrl && isset($offer['url']) && str_contains($offer['url'], $targetUrl)) {
                                 $data['price'] = floatval($offer['price'] ?? $offer['lowPrice'] ?? 0);
                                 $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
@@ -448,18 +471,21 @@ class ScraperService {
     }
 
     private function cleanHtml(string $html): string {
-        // Supprime les blocs sponsorisés Amazon connus qui polluent l'extraction du prix
+        // Supprime les blocs sponsorisés et recommandations qui polluent l'extraction du prix
         $patterns = [
-            // Blocs Sponsored Products (Carrousels) - se terminent généralement par a-end
+            // Blocs Sponsored Products Amazon (Carrousels) - se terminent généralement par a-end
             '/<div[^>]*id="sp_detail\d?"[^>]*>.*?<span class="a-end aok-hidden"><\/span>.*?<\/div>/is',
-            // Blocs APE (Amazon Placement Engine)
+            // Blocs APE Amazon (Amazon Placement Engine)
             '/<div[^>]*id="ape_Detail[^>]*>.*?<\/div>\s*<\/div>/is',
-            // Attributs de feedback publicitaire (contiennent souvent des prix bruts en JSON)
+            // Attributs de feedback publicitaire
             '/data-adfeedbackdetails=["\'].*?["\']/is',
             // Blocs cart/header Shopify
             '/<div[^>]*id="cart-notification"[^>]*>.*?<\/div>/is',
             '/<div[^>]*class="[^"]*cart-drawer[^"]*"[^>]*>.*?<\/div>/is',
             '/<header[^>]*>.*?<\/header>/is',
+            // AliExpress Recommandations et "More to love"
+            '/<div[^>]*class="[^"]*(?:rcmd|recommend|MoreOtherSeller)[^"]*"[^>]*>.*?<\/div>/is',
+            '/<div[^>]*id="[^"]*(?:nav-moretolove)[^"]*"[^>]*>.*?<\/div>/is',
         ];
 
         foreach ($patterns as $pattern) {
@@ -480,5 +506,22 @@ class ScraperService {
         if (empty($data['title']) && preg_match('/<meta.*?content=["\'](.*?)["\'].*?(?:property|name)=["\']og:title["\']/is', $html, $m)) $data['title'] = html_entity_decode(trim($m[1]));
 
         return $data;
+    }
+
+    private function getProductId(string $url) {
+        if (str_contains($url, 'amazon.')) {
+            if (preg_match('/(?:\/dp\/|\/gp\/product\/|\/gp\/aw\/d\/|\/o\/|\/aw\/d\/|\/product\/)([A-Z0-9]{10})/i', $url, $matches)) {
+                return $matches[1];
+            }
+        }
+        if (str_contains($url, 'aliexpress.')) {
+            if (preg_match('/\/item\/(\d+)\.html/i', $url, $matches)) {
+                return $matches[1];
+            }
+            if (preg_match('/productId=(\d+)/i', $url, $matches)) {
+                return $matches[1];
+            }
+        }
+        return null;
     }
 }
