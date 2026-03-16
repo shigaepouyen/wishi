@@ -45,7 +45,7 @@ class ScraperService {
             // si aucune devise n'est déjà spécifiée.
             // On limite cette pratique aux domaines qui ne semblent pas être des moteurs de recherche
             // ou des URLs complexes pour éviter de casser des signatures.
-            if (!str_contains($url, 'currency=') && !str_contains($url, 'amazon.') && !str_contains($url, 'google.')) {
+            if (!str_contains($url, 'currency=') && !str_contains($url, 'amazon.') && !str_contains($url, 'google.') && !str_contains($url, 'aliexpress.')) {
                 $separator = str_contains($url, '?') ? '&' : '?';
                 $url = $url . $separator . 'currency=EUR';
             }
@@ -90,7 +90,7 @@ class ScraperService {
             if (!$html || strlen($html) < 200) throw new \Exception("La page n'a pas pu être chargée correctement.");
 
             // On vérifie si on n'est pas tombé sur un Captcha (Sauf si on a déjà des données OG utiles)
-            if (empty($ogData['title']) && (str_contains($html, 'api-services-support@amazon.com') || str_contains($html, 'captcha'))) {
+            if (empty($ogData['title']) && (str_contains($html, 'api-services-support@amazon.com') || str_contains($html, 'captcha') || str_contains($html, 'punish'))) {
                  throw new \Exception("Le site a bloqué la requête (Captcha détecté).");
             }
 
@@ -245,6 +245,7 @@ class ScraperService {
             '/"actPriceDisplay":"([^"]+)"/i',                        // AliExpress v11
             '/"minPrice":"([^"]+)"/i',                               // AliExpress v12
             '/"maxPrice":"([^"]+)"/i',                               // AliExpress v13
+            '/"price":"([^"]+)"/i',                                  // AliExpress v14
             '/"price":\s*([0-9.]+)/i',                               // Generic JSON numeric price
             '/"price":\s*"([^"]+)"/i',                               // Generic JSON string price
             '/"skuAmount":\s*\{[^}]*?"value":\s*([0-9.]+)/i',        // AliExpress SKU amount
