@@ -36,9 +36,9 @@ class ScraperService {
 
     public function getLinkData(string $url) {
         try {
-            // Pour AliExpress on évite le Referer google qui peut déclencher des redirections infinies
+            // Pour AliExpress et Etsy on évite le Referer google qui peut déclencher des erreurs ou redirections
             $headers = [];
-            if (!str_contains($url, 'aliexpress.com')) {
+            if (!str_contains($url, 'aliexpress.com') && !str_contains($url, 'etsy.com')) {
                 $headers['Referer'] = 'https://www.google.com/';
             }
 
@@ -148,12 +148,14 @@ class ScraperService {
             $amazonImages = $this->extractAmazonImages($html);
             $amazonTitle = $this->extractAmazonTitle($html);
             $aliexpressImages = $this->extractAliexpressImages($html);
+            $etsyImages = $this->extractEtsyImages($html);
 
             // On agrège les images candidates
             $images = [];
             if ($image) $images[] = $image;
             if (!empty($amazonImages)) $images = array_merge($images, $amazonImages);
             if (!empty($aliexpressImages)) $images = array_merge($images, $aliexpressImages);
+            if (!empty($etsyImages)) $images = array_merge($images, $etsyImages);
 
             // On enlève les doublons et on s'assure que les URLs sont valides
             $images = array_values(array_unique(array_filter($images)));
@@ -207,7 +209,8 @@ class ScraperService {
             '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/',   // Amazon inputs (Priorité car spécifique au produit principal)
             '/"priceAmount":\s*([0-9.]+)/',                          // Amazon
             '/"price":\s*\{[^}]*?"amount":\s*([0-9.]+)/i',           // AliExpress v1
-            '/"price":\s*"([0-9.]+)"/i',                            // Schema.org simple string
+            '/"price":\s*"([^"]+)"/i',                               // Schema.org simple string
+            '/"lowPrice":\s*"([^"]+)"/i',                            // Schema.org AggregateOffer
             '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
             '/"minPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v3
         ];
@@ -260,14 +263,14 @@ class ScraperService {
 
     private function detectCurrency($html) {
         // On check les indices dans le code source global avec support des guillemets encodés
-        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
-        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?USD["\']?/i', $html) || str_contains($html, '$')) return 'USD';
-        if (preg_match('/currencyCode["\']?\s*[:=]\s*["\']?GBP["\']?/i', $html) || str_contains($html, '£')) return 'GBP';
+        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
+        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?USD["\']?/i', $html) || str_contains($html, '$')) return 'USD';
+        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?GBP["\']?/i', $html) || str_contains($html, '£')) return 'GBP';
 
         // Support pour les formats &quot;
-        if (str_contains($html, 'currencyCode&quot;:&quot;EUR&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;€&quot;')) return 'EUR';
-        if (str_contains($html, 'currencyCode&quot;:&quot;USD&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;$&quot;')) return 'USD';
-        if (str_contains($html, 'currencyCode&quot;:&quot;GBP&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;£&quot;')) return 'GBP';
+        if (str_contains($html, 'currencyCode&quot;:&quot;EUR&quot;') || str_contains($html, 'priceCurrency&quot;:&quot;EUR&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;€&quot;')) return 'EUR';
+        if (str_contains($html, 'currencyCode&quot;:&quot;USD&quot;') || str_contains($html, 'priceCurrency&quot;:&quot;USD&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;$&quot;')) return 'USD';
+        if (str_contains($html, 'currencyCode&quot;:&quot;GBP&quot;') || str_contains($html, 'priceCurrency&quot;:&quot;GBP&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;£&quot;')) return 'GBP';
 
         return 'EUR';
     }
@@ -322,6 +325,15 @@ class ScraperService {
         return $found;
     }
 
+    private function extractEtsyImages($html) {
+        $found = [];
+        // On cherche les images haute résolution dans le HTML (pattern fullxfull)
+        if (preg_match_all('/https:\/\/i\.etsystatic\.com\/[a-zA-Z0-9\/._-]*il_fullxfull\.[a-zA-Z0-9\/._-]*/i', $html, $matches)) {
+            $found = array_merge($found, $matches[0]);
+        }
+        return $found;
+    }
+
     /**
      * Extrait les données structurées JSON-LD
      */
@@ -349,16 +361,26 @@ class ScraperService {
                         $data['title'] = $item['name'] ?? $data['title'];
                         $data['description'] = $item['description'] ?? $data['description'];
                         if (isset($item['image'])) {
-                            $data['image'] = is_array($item['image']) ? ($item['image'][0] ?? $data['image']) : $item['image'];
+                            if (is_array($item['image'])) {
+                                $firstImage = $item['image'][0] ?? null;
+                                if (is_array($firstImage)) {
+                                    $data['image'] = $firstImage['contentURL'] ?? $firstImage['url'] ?? $data['image'];
+                                } else {
+                                    $data['image'] = $firstImage;
+                                }
+                            } else {
+                                $data['image'] = $item['image'];
+                            }
                         }
                     }
 
                     // Extraction du prix dans le JSON-LD
                     if (isset($item['offers'])) {
-                        $offers = is_array($item['offers']) && !isset($item['offers']['price']) ? $item['offers'] : [$item['offers']];
+                        $offers = is_array($item['offers']) && !isset($item['offers']['price']) && !isset($item['offers']['lowPrice']) ? $item['offers'] : [$item['offers']];
                         foreach ($offers as $offer) {
-                            if (isset($offer['price']) && $offer['price'] > 0) {
-                                $data['price'] = floatval($offer['price']);
+                            $price = $offer['price'] ?? $offer['lowPrice'] ?? null;
+                            if ($price && floatval($price) > 0) {
+                                $data['price'] = floatval($price);
                                 $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
                             } elseif (isset($offer['priceSpecification'])) {
                                 $spec = is_array($offer['priceSpecification']) && !isset($offer['priceSpecification']['price'])
