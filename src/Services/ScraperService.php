@@ -119,6 +119,10 @@ class ScraperService {
                     $description = html_entity_decode(trim($matches[1]));
                 }
             }
+            // Fallback pour Pop Mart et autres structures SPA sans meta description utile
+            if ((!$description || strlen($description) < 50) && preg_match('/<pre[^>]*class="[^"]*Desc[^"]*"[^>]*>(.*?)<\/pre>/is', $html, $matches)) {
+                $description = html_entity_decode(trim($matches[1]));
+            }
             if (!$description) {
                 if (preg_match('/<meta.*?property=["\']og:description["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
                     preg_match('/<meta.*?content=["\'](.*?)["\'].*?property=["\']og:description["\']/is', $html, $matches)) {
@@ -219,6 +223,7 @@ class ScraperService {
             '/"priceText":\s*"([^"]+)"/i',                           // AliExpress v6
             '/"value":\s*([0-9.]+),\s*"currency":/i',                // AliExpress v7 (Price module)
             '/"price":\s*([0-9.]+)/i',                               // Generic JSON numeric price
+            '/"price":\s*"([^"]+)"/i',                               // Generic JSON string price
         ];
 
         foreach ($jsonPatterns as $pattern) {
@@ -243,7 +248,8 @@ class ScraperService {
         // STRATÉGIE 3 : Fallback sur la balise visuelle a-offscreen (Amazon) ou classes prix communes
         $visualPatterns = [
             '/<span class="a-offscreen">([^<]+)<\/span>/',
-            '/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/i'
+            '/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/i',
+            '/<div[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/div>/i'
         ];
 
         foreach ($visualPatterns as $pattern) {
