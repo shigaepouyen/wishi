@@ -31,7 +31,11 @@ class CurrencyUtils {
         // Fallbacks statiques au cas où l'API est down
         $fallbacks = [
             'USD' => 1.09,
-            'GBP' => 0.85
+            'GBP' => 0.85,
+            'CHF' => 0.95,
+            'CAD' => 1.45,
+            'AUD' => 1.65,
+            'JPY' => 160.0,
         ];
 
         if (isset($fallbacks[$currency])) {

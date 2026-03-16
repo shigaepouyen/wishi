@@ -42,6 +42,15 @@ class ScraperService {
                 $headers['Referer'] = 'https://www.google.com/';
             }
 
+            // Pour Shopify et d'autres plateformes, on tente de forcer la devise en EUR via l'URL
+            // si aucune devise n'est déjà spécifiée.
+            // On limite cette pratique aux domaines qui ne semblent pas être des moteurs de recherche
+            // ou des URLs complexes pour éviter de casser des signatures.
+            if (!str_contains($url, 'currency=') && !str_contains($url, 'amazon.') && !str_contains($url, 'google.')) {
+                $separator = str_contains($url, '?') ? '&' : '?';
+                $url = $url . $separator . 'currency=EUR';
+            }
+
             $response = $this->client->get($url, [
                 'headers' => $headers,
                 'http_errors' => false
@@ -209,11 +218,16 @@ class ScraperService {
         // STRATÉGIE 0 : Nettoyage préalable pour éviter de matcher les publicités sponsorisées
         $cleanHtml = $this->cleanHtml($html);
 
-        // STRATÉGIE 1 : Patterns JSON e-commerce (Amazon, AliExpress, etc.)
+        // On détecte la devise une fois pour toute la page
+        $detectedCurrency = $this->detectCurrency($cleanHtml);
+
+        // STRATÉGIE 1 : Patterns JSON e-commerce (Amazon, AliExpress, Shopify etc.)
         $jsonPatterns = [
             '/customerVisiblePrice\]\[amount\]" value="([^"]+)"/',   // Amazon inputs (Priorité car spécifique au produit principal)
             '/"priceAmount":\s*([0-9.]+)/',                          // Amazon
             '/"price":\s*\{[^}]*?"amount":\s*([0-9.]+)/i',           // AliExpress v1
+            '/Price:\s*"[^"]*?([0-9][0-9,.]*)"/i',                   // Viewed Product script (Shopify/Klaviyo)
+            '/Value:\s*"([0-9][0-9,.]*)"/i',                         // Viewed Product script (Shopify/Klaviyo)
             '/"price":\s*"([^"]+)"/i',                               // Schema.org simple string
             '/"lowPrice":\s*"([^"]+)"/i',                            // Schema.org AggregateOffer
             '/"actPriceDisplay":\s*"([^"]+)"/i',                     // AliExpress v2
@@ -232,7 +246,7 @@ class ScraperService {
                 $val = preg_replace('/[^0-9.]/', '', $val);
                 return [
                     'amount' => floatval($val),
-            'currency' => $this->detectCurrency($cleanHtml)
+                    'currency' => $detectedCurrency
                 ];
             }
         }
@@ -241,7 +255,7 @@ class ScraperService {
         if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $cleanHtml, $matches)) {
             return [
                 'amount' => floatval($matches[1]),
-        'currency' => $this->detectCurrency($cleanHtml)
+                'currency' => $detectedCurrency
             ];
         }
 
@@ -255,7 +269,10 @@ class ScraperService {
         foreach ($visualPatterns as $pattern) {
             if (preg_match($pattern, $html, $matches)) {
                 $priceStr = html_entity_decode($matches[1]);
-                $currency = (str_contains($priceStr, '€')) ? 'EUR' : ((str_contains($priceStr, '$')) ? 'USD' : 'GBP');
+                $currency = $detectedCurrency;
+                if (str_contains($priceStr, '€')) $currency = 'EUR';
+                elseif (str_contains($priceStr, '$')) $currency = 'USD';
+                elseif (str_contains($priceStr, '£')) $currency = 'GBP';
 
                 $clean = preg_replace('/[^\d,.]/', '', $priceStr);
                 $clean = str_replace(',', '.', $clean);
@@ -277,6 +294,14 @@ class ScraperService {
         // STRATÉGIE 1 : Chercher dans les balises meta (plus fiable que le contenu global)
         if (preg_match('/<meta.*?property=["\']og:price:currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
         if (preg_match('/<meta.*?name=["\']currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
+
+        // STRATÉGIE 2 : Plateformes spécifiques (Shopify)
+        if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return $m[1];
+        if (preg_match('/Price:\s*"([^"]*?)(?:EUR|USD|GBP|€|\$|£|[\d,.]+)"/i', $html, $m)) {
+            if (str_contains($m[0], '€') || str_contains($m[0], 'EUR')) return 'EUR';
+            if (str_contains($m[0], '$') || str_contains($m[0], 'USD')) return 'USD';
+            if (str_contains($m[0], '£') || str_contains($m[0], 'GBP')) return 'GBP';
+        }
 
         // On check les indices dans le code source global avec support des guillemets encodés
         if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
