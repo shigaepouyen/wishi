@@ -104,7 +104,7 @@ class ScraperService {
             $image = $image ?: ($ogData['image'] ?? '');
 
             // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, AliExpress, etc.)
-            $ldData = $this->extractJsonLdData($html);
+            $ldData = $this->extractJsonLdData($html, $url);
             $title = $ldData['title'] ?: $title;
             $description = $ldData['description'] ?: $description;
             $image = $ldData['image'] ?: $image;
@@ -134,13 +134,14 @@ class ScraperService {
 
             // Nettoyage final
             $title = trim(str_replace(["\n", "\r"], ' ', $title));
-            $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 500, "...");
+            $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 2000, "...");
 
             // Extraction avancée du prix
             $priceData = $this->extractPrice($html);
 
-            // Si le prix n'a pas été trouvé par les regex, on utilise les données JSON-LD
-            if ($priceData['amount'] <= 0 && $ldData['price']) {
+            // Priorité absolue aux données JSON-LD si elles correspondent à la variante
+            // ou si le prix trouvé par regex est suspect (ex: $0.00 ou $0.01 souvent liés au panier/frais)
+            if ($ldData['price'] && ($priceData['amount'] <= 0.01 || $ldData['currency'] !== $priceData['currency'])) {
                 $priceData['amount'] = $ldData['price'];
                 $priceData['currency'] = $ldData['currency'] ?: $priceData['currency'];
             }
@@ -165,7 +166,7 @@ class ScraperService {
             $images = array_filter($images, function($url) use ($blacklist) {
                 $urlLower = strtolower($url);
                 // Exclure les extensions non-photo
-                if (preg_match('/\.(svg|gif|webp)$/i', $url)) return false;
+                if (preg_match('/\.(svg|gif)$/i', $url)) return false;
                 // Exclure si contient un mot de la blacklist
                 foreach ($blacklist as $word) {
                     if (str_contains($urlLower, $word)) return false;
@@ -217,6 +218,7 @@ class ScraperService {
             '/"salePrice":\s*"([^"]+)"/i',                           // AliExpress v5
             '/"priceText":\s*"([^"]+)"/i',                           // AliExpress v6
             '/"value":\s*([0-9.]+),\s*"currency":/i',                // AliExpress v7 (Price module)
+            '/"price":\s*([0-9.]+)/i',                               // Generic JSON numeric price
         ];
 
         foreach ($jsonPatterns as $pattern) {
@@ -225,7 +227,7 @@ class ScraperService {
                 $val = preg_replace('/[^0-9.]/', '', $val);
                 return [
                     'amount' => floatval($val),
-                    'currency' => $this->detectCurrency($html)
+            'currency' => $this->detectCurrency($cleanHtml)
                 ];
             }
         }
@@ -234,7 +236,7 @@ class ScraperService {
         if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $cleanHtml, $matches)) {
             return [
                 'amount' => floatval($matches[1]),
-                'currency' => $this->detectCurrency($html)
+        'currency' => $this->detectCurrency($cleanHtml)
             ];
         }
 
@@ -266,6 +268,10 @@ class ScraperService {
     }
 
     private function detectCurrency($html) {
+        // STRATÉGIE 1 : Chercher dans les balises meta (plus fiable que le contenu global)
+        if (preg_match('/<meta.*?property=["\']og:price:currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
+        if (preg_match('/<meta.*?name=["\']currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
+
         // On check les indices dans le code source global avec support des guillemets encodés
         if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
         if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?USD["\']?/i', $html) || str_contains($html, '$')) return 'USD';
@@ -341,7 +347,7 @@ class ScraperService {
     /**
      * Extrait les données structurées JSON-LD
      */
-    private function extractJsonLdData($html) {
+    private function extractJsonLdData($html, $targetUrl = null) {
         $data = ['title' => null, 'description' => null, 'image' => null, 'price' => null, 'currency' => null];
 
         if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
@@ -382,8 +388,15 @@ class ScraperService {
                     if (isset($item['offers'])) {
                         $offers = is_array($item['offers']) && !isset($item['offers']['price']) && !isset($item['offers']['lowPrice']) ? $item['offers'] : [$item['offers']];
                         foreach ($offers as $offer) {
+                            // Si on a une URL cible (variante), on privilégie l'offre qui correspond
+                            if ($targetUrl && isset($offer['url']) && str_contains($offer['url'], $targetUrl)) {
+                                $data['price'] = floatval($offer['price'] ?? $offer['lowPrice'] ?? 0);
+                                $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
+                                break;
+                            }
+
                             $price = $offer['price'] ?? $offer['lowPrice'] ?? null;
-                            if ($price && floatval($price) > 0) {
+                            if ($price && floatval($price) > 0 && !$data['price']) {
                                 $data['price'] = floatval($price);
                                 $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
                             } elseif (isset($offer['priceSpecification'])) {
@@ -412,6 +425,10 @@ class ScraperService {
             '/<div[^>]*id="ape_Detail[^>]*>.*?<\/div>\s*<\/div>/is',
             // Attributs de feedback publicitaire (contiennent souvent des prix bruts en JSON)
             '/data-adfeedbackdetails=["\'].*?["\']/is',
+            // Blocs cart/header Shopify
+            '/<div[^>]*id="cart-notification"[^>]*>.*?<\/div>/is',
+            '/<div[^>]*class="[^"]*cart-drawer[^"]*"[^>]*>.*?<\/div>/is',
+            '/<header[^>]*>.*?<\/header>/is',
         ];
 
         foreach ($patterns as $pattern) {
