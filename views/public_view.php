@@ -74,9 +74,8 @@
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="text-[9px] font-black text-<?= $color ?>-500 uppercase tracking-widest"><?= htmlspecialchars($item['category'] ?: 'Souhait') ?></span>
                                 <?php if($item['url']): ?>
-                                    <span class="text-[8px] font-bold text-slate-300 uppercase tracking-tight bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 flex items-center gap-1">
-                                        <svg class="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" stroke-width="3"/></svg>
-                                        <?= \App\Utils\UrlUtils::getDomainLabel($item['url']) ?>
+                                    <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest ml-1 opacity-60 italic">
+                                        via <?= \App\Utils\UrlUtils::getDomainLabel($item['url']) ?>
                                     </span>
                                 <?php endif; ?>
                             </div>
