@@ -71,7 +71,14 @@
                             <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.png') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
-                            <span class="text-[9px] font-black text-<?= $color ?>-500 uppercase tracking-widest mb-1"><?= htmlspecialchars($item['category'] ?: 'Souhait') ?></span>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[9px] font-black text-<?= $color ?>-500 uppercase tracking-widest"><?= htmlspecialchars($item['category'] ?: 'Souhait') ?></span>
+                                <?php if($item['url']): ?>
+                                    <span class="text-[8px] font-bold text-slate-300 uppercase tracking-widest ml-1 opacity-60 italic">
+                                        via <?= \App\Utils\UrlUtils::getDomainLabel($item['url']) ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                             <h3 class="font-bold text-slate-800 text-lg leading-tight truncate-2-lines"><?= htmlspecialchars($item['title']) ?></h3>
                             <?php if (!empty($item['description'])): ?>
                                 <p class="text-[11px] text-slate-500 mt-1.5 leading-snug line-clamp-3"><?= nl2br(htmlspecialchars($item['description'])) ?></p>

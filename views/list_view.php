@@ -79,8 +79,15 @@
                             <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.png') ?>" class="w-full h-full object-cover">
                         </div>
                         <div class="min-w-0 flex-1">
-                            <span class="text-[8px] font-black text-<?= $color ?>-500 uppercase tracking-widest truncate block"><?= htmlspecialchars($item['category'] ?: 'Divers') ?></span>
-                            <h3 class="font-bold text-slate-800 leading-tight truncate-2-lines mt-0.5 text-sm"><?= htmlspecialchars($item['title']) ?></h3>
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-[8px] font-black text-<?= $color ?>-500 uppercase tracking-widest truncate"><?= htmlspecialchars($item['category'] ?: 'Divers') ?></span>
+                                <?php if($item['url']): ?>
+                                    <span class="text-[7px] font-bold text-slate-300 uppercase tracking-widest ml-1 opacity-60 italic">
+                                        via <?= \App\Utils\UrlUtils::getDomainLabel($item['url']) ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <h3 class="font-bold text-slate-800 leading-tight truncate-2-lines text-sm"><?= htmlspecialchars($item['title']) ?></h3>
                             <?php if (!empty($item['description'])): ?>
                                 <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2 italic"><?= htmlspecialchars($item['description']) ?></p>
                             <?php endif; ?>
