@@ -58,4 +58,38 @@ class UrlUtils {
 
         return $newUrl;
     }
+
+    /**
+     * Extrait un nom de domaine lisible pour affichage
+     */
+    public static function getDomainLabel(?string $url): string {
+        if (!$url) return '';
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!$host) return '';
+
+        // Nettoyage des sous-domaines communs
+        $host = preg_replace('/^www\./', '', $host);
+
+        // Cas spécifiques
+        if (str_contains($host, 'amazon.')) return 'Amazon';
+        if (str_contains($host, 'aliexpress.')) return 'AliExpress';
+        if (str_contains($host, 'etsy.')) return 'Etsy';
+        if (str_contains($host, 'decathlon.')) return 'Decathlon';
+        if (str_contains($host, 'fnac.')) return 'Fnac';
+        if (str_contains($host, 'vinted.')) return 'Vinted';
+        if (str_contains($host, 'popmart.')) return 'Pop Mart';
+
+        // Fallback sur le nom de domaine principal sans l'extension
+        $parts = explode('.', $host);
+        if (count($parts) >= 2) {
+            // Pour co.uk, com.be etc, on essaie d'être malin
+            if (strlen($parts[count($parts)-2]) <= 3 && count($parts) >= 3) {
+                return ucfirst($parts[count($parts)-3]);
+            }
+            return ucfirst($parts[count($parts)-2]);
+        }
+
+        return ucfirst($host);
+    }
 }
