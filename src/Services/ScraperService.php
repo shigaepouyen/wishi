@@ -54,7 +54,6 @@ class ScraperService {
                 'headers' => $headers,
                 'http_errors' => false,
                 'curl' => [
-                    CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_MAXREDIRS => 30,
                 ]
             ]);
@@ -274,12 +273,12 @@ class ScraperService {
         // STRATÉGIE 3 : Fallback sur la balise visuelle a-offscreen (Amazon) ou classes prix communes
         $visualPatterns = [
             '/<span class="a-offscreen">([^<]+)<\/span>/',
-            '/<span[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/span>/i',
-            '/<div[^>]*class="[^"]*price[^"]*"[^>]*>([^<]+)<\/div>/i'
+            '/<span[^>]*class="[^"]*price(?:-default--current)?[^"]*"[^>]*>([^<]+)<\/span>/i',
+            '/<div[^>]*class="[^"]*price(?:-default--current)?[^"]*"[^>]*>([^<]+)<\/div>/i'
         ];
 
         foreach ($visualPatterns as $pattern) {
-            if (preg_match($pattern, $html, $matches)) {
+            if (preg_match($pattern, $cleanHtml, $matches)) {
                 $priceStr = html_entity_decode($matches[1]);
                 $currency = $detectedCurrency;
                 if (str_contains($priceStr, '€')) $currency = 'EUR';
@@ -309,7 +308,7 @@ class ScraperService {
 
         // STRATÉGIE 2 : Plateformes spécifiques
         if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return $m[1];
-        if (preg_match('/"currencyCode":\s*"([^"]+)"/i', $html, $m)) return $m[1]; // AliExpress/Generic JSON
+        if (preg_match('/"(?:currencyCode|priceCurrency)":\s*"([^"]+)"/i', $html, $m)) return $m[1]; // AliExpress/Generic JSON
         if (preg_match('/Price:\s*"([^"]*?)(?:EUR|USD|GBP|€|\$|£|[\d,.]+)"/i', $html, $m)) {
             if (str_contains($m[0], '€') || str_contains($m[0], 'EUR')) return 'EUR';
             if (str_contains($m[0], '$') || str_contains($m[0], 'USD')) return 'USD';
@@ -485,8 +484,9 @@ class ScraperService {
             '/<div[^>]*class="[^"]*cart-drawer[^"]*"[^>]*>.*?<\/div>/is',
             '/<header[^>]*>.*?<\/header>/is',
             // AliExpress Recommandations et "More to love"
-            '/<div[^>]*class="[^"]*(?:rcmd|recommend|MoreOtherSeller)[^"]*"[^>]*>.*?<\/div>/is',
+            '/<div[^>]*class="[^"]*(?:rcmd|recommend|MoreOtherSeller|fusion-card|rcmd-hover-more-action)[^"]*"[^>]*>.*?<\/div>/is',
             '/<div[^>]*id="[^"]*(?:nav-moretolove)[^"]*"[^>]*>.*?<\/div>/is',
+            '/<div[^>]*data-spm="[^"]*MoreOtherSeller[^"]*"[^>]*>.*?<\/div>/is',
         ];
 
         foreach ($patterns as $pattern) {
