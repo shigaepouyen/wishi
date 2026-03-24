@@ -268,10 +268,9 @@ class ScraperService {
 
         foreach ($jsonPatterns as $pattern) {
             if (preg_match($pattern, $cleanHtml, $matches)) {
-                $val = str_replace([' ', ','], ['', '.'], $matches[1]);
-                $val = preg_replace('/[^0-9.]/', '', $val);
+                $val = $this->normalizePriceAmount($matches[1]);
                 return [
-                    'amount' => floatval($val),
+                    'amount' => $val,
                     'currency' => $detectedCurrency
                 ];
             }
@@ -279,8 +278,9 @@ class ScraperService {
 
         // STRATÉGIE 2 : Meta tags spécifiques au prix
         if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $cleanHtml, $matches)) {
+            $amount = $this->normalizePriceAmount($matches[1]);
             return [
-                'amount' => floatval($matches[1]),
+                'amount' => $amount,
                 'currency' => $detectedCurrency
             ];
         }
@@ -300,10 +300,7 @@ class ScraperService {
                 elseif (str_contains($priceStr, '$')) $currency = 'USD';
                 elseif (str_contains($priceStr, '£')) $currency = 'GBP';
 
-                $clean = preg_replace('/[^\d,.]/', '', $priceStr);
-                $clean = str_replace(',', '.', $clean);
-
-                $amount = floatval($clean);
+                $amount = $this->normalizePriceAmount($priceStr);
                 if ($amount > 0) {
                     return [
                         'amount' => $amount,
@@ -318,12 +315,12 @@ class ScraperService {
 
     private function detectCurrency($html) {
         // STRATÉGIE 1 : Chercher dans les balises meta (plus fiable que le contenu global)
-        if (preg_match('/<meta.*?property=["\']og:price:currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
-        if (preg_match('/<meta.*?name=["\']currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return $m[1];
+        if (preg_match('/<meta.*?property=["\']og:price:currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return strtoupper(trim($m[1]));
+        if (preg_match('/<meta.*?name=["\']currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return strtoupper(trim($m[1]));
 
         // STRATÉGIE 2 : Plateformes spécifiques
-        if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return $m[1];
-        if (preg_match('/"(?:currencyCode|priceCurrency)":\s*"([^"]+)"/i', $html, $m)) return $m[1]; // AliExpress/Generic JSON
+        if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return strtoupper(trim($m[1]));
+        if (preg_match('/"(?:currencyCode|priceCurrency)":\s*"([^"]+)"/i', $html, $m)) return strtoupper(trim($m[1])); // AliExpress/Generic JSON
         if (preg_match('/Price:\s*"([^"]*?)(?:EUR|USD|GBP|€|\$|£|[\d,.]+)"/i', $html, $m)) {
             if (str_contains($m[0], '€') || str_contains($m[0], 'EUR')) return 'EUR';
             if (str_contains($m[0], '$') || str_contains($m[0], 'USD')) return 'USD';
@@ -331,16 +328,63 @@ class ScraperService {
         }
 
         // On check les indices dans le code source global avec support des guillemets encodés
-        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?EUR["\']?/i', $html) || str_contains($html, '€')) return 'EUR';
-        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?USD["\']?/i', $html) || str_contains($html, '$')) return 'USD';
-        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?GBP["\']?/i', $html) || str_contains($html, '£')) return 'GBP';
+        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?(EUR)["\']?/i', $html, $m)) return strtoupper($m[1]);
+        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?(USD)["\']?/i', $html, $m)) return strtoupper($m[1]);
+        if (preg_match('/(?:currencyCode|priceCurrency)["\']?\s*[:=]\s*["\']?(GBP)["\']?/i', $html, $m)) return strtoupper($m[1]);
 
         // Support pour les formats &quot;
         if (str_contains($html, 'currencyCode&quot;:&quot;EUR&quot;') || str_contains($html, 'priceCurrency&quot;:&quot;EUR&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;€&quot;')) return 'EUR';
         if (str_contains($html, 'currencyCode&quot;:&quot;USD&quot;') || str_contains($html, 'priceCurrency&quot;:&quot;USD&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;$&quot;')) return 'USD';
         if (str_contains($html, 'currencyCode&quot;:&quot;GBP&quot;') || str_contains($html, 'priceCurrency&quot;:&quot;GBP&quot;') || str_contains($html, 'currencySymbol&quot;:&quot;£&quot;')) return 'GBP';
 
+        if (preg_match('/(?:€|&euro;)\s*\d|\d[\d\s,.]*\s*(?:€|&euro;)/iu', $html)) return 'EUR';
+        if (preg_match('/(?:US?\$|&#36;|\$)\s*\d|\d[\d\s,.]*\s*(?:US?\$|&#36;|\$)/iu', $html)) return 'USD';
+        if (preg_match('/(?:£|&pound;)\s*\d|\d[\d\s,.]*\s*(?:£|&pound;)/iu', $html)) return 'GBP';
+
         return 'EUR';
+    }
+
+    private function normalizePriceAmount(string $rawAmount): float {
+        $normalized = html_entity_decode(trim($rawAmount));
+        $normalized = preg_replace('/[^\d,.\s]/u', '', $normalized);
+        $normalized = preg_replace('/\s+/', '', $normalized);
+
+        if ($normalized === '') {
+            return 0.0;
+        }
+
+        $lastComma = strrpos($normalized, ',');
+        $lastDot = strrpos($normalized, '.');
+
+        if ($lastComma !== false && $lastDot !== false) {
+            if ($lastComma > $lastDot) {
+                $normalized = str_replace('.', '', $normalized);
+                $normalized = str_replace(',', '.', $normalized);
+            } else {
+                $normalized = str_replace(',', '', $normalized);
+            }
+        } elseif ($lastComma !== false || $lastDot !== false) {
+            $separator = $lastComma !== false ? ',' : '.';
+            $count = substr_count($normalized, $separator);
+            $lastPos = strrpos($normalized, $separator);
+            $digitsAfter = strlen($normalized) - $lastPos - 1;
+
+            if ($count > 1) {
+                $parts = explode($separator, $normalized);
+                $decimalPart = array_pop($parts);
+                if ($digitsAfter === 2 && $decimalPart !== '') {
+                    $normalized = implode('', $parts) . '.' . $decimalPart;
+                } else {
+                    $normalized = implode('', $parts) . $decimalPart;
+                }
+            } elseif ($digitsAfter === 3) {
+                $normalized = str_replace($separator, '', $normalized);
+            } elseif ($separator === ',') {
+                $normalized = str_replace(',', '.', $normalized);
+            }
+        }
+
+        return is_numeric($normalized) ? (float)$normalized : 0.0;
     }
 
     private function extractAmazonImages($html) {
@@ -407,8 +451,10 @@ class ScraperService {
      */
     private function extractJsonLdData($html, $targetUrl = null) {
         $data = ['title' => null, 'description' => null, 'image' => null, 'price' => null, 'currency' => null];
+        $targetId = $targetUrl ? $this->getProductId($targetUrl) : null;
+        $matchedTargetItem = false;
 
-        if (preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/is', $html, $matches)) {
+        if (preg_match_all('/<script\b[^>]*type\s*=\s*["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $matches)) {
             foreach ($matches[1] as $jsonText) {
                 $jsonData = json_decode(trim($jsonText), true);
                 if (!$jsonData) continue;
@@ -416,64 +462,68 @@ class ScraperService {
                 $items = isset($jsonData['@graph']) ? $jsonData['@graph'] : (isset($jsonData[0]) ? $jsonData : [$jsonData]);
 
                 foreach ($items as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+
                     // On ignore les produits sponsorisés dans le JSON-LD
                     $itemString = json_encode($item);
-                    if (str_contains(strtolower($itemString), 'sponsored') || str_contains(strtolower($itemString), 'sponsorisé')) {
+                    if (is_string($itemString) && (str_contains(strtolower($itemString), 'sponsored') || str_contains(strtolower($itemString), 'sponsorisé'))) {
                         continue;
                     }
 
                     $type = $item['@type'] ?? '';
+                    if (is_array($type)) {
+                        $type = implode(' ', $type);
+                    }
                     $isProduct = str_contains($type, 'Product') || $type === 'Offer';
+                    $itemMatchesTarget = $this->jsonLdItemMatchesTarget($item, $targetUrl, $targetId);
 
-                    if ($isProduct) {
-                        $data['title'] = $item['name'] ?? $data['title'];
-                        $data['description'] = $item['description'] ?? $data['description'];
-                        if (isset($item['image'])) {
-                            if (is_array($item['image'])) {
-                                $firstImage = $item['image'][0] ?? null;
-                                if (is_array($firstImage)) {
-                                    $data['image'] = $firstImage['contentURL'] ?? $firstImage['url'] ?? $data['image'];
-                                } else {
-                                    $data['image'] = $firstImage;
-                                }
-                            } else {
-                                $data['image'] = $item['image'];
-                            }
-                        }
+                    if ($isProduct && ($itemMatchesTarget || !$matchedTargetItem)) {
+                        $this->mergeJsonLdItemData($data, $item, $itemMatchesTarget);
+                    }
+
+                    if ($itemMatchesTarget) {
+                        $matchedTargetItem = true;
                     }
 
                     // Extraction du prix dans le JSON-LD
                     if (isset($item['offers'])) {
                         $offers = is_array($item['offers']) && !isset($item['offers']['price']) && !isset($item['offers']['lowPrice']) ? $item['offers'] : [$item['offers']];
                         foreach ($offers as $offer) {
+                            if (!is_array($offer)) {
+                                continue;
+                            }
+
                             // Si on a une URL cible (variante), on privilégie l'offre qui correspond
                             // On utilise getProductId pour une comparaison robuste (AliExpress change souvent de domaine .com/.us)
-                            $targetId = $targetUrl ? $this->getProductId($targetUrl) : null;
                             $offerUrl = $offer['url'] ?? null;
                             $offerId = $offerUrl ? $this->getProductId($offerUrl) : null;
+                            $offerPrice = $this->normalizePriceAmount((string)($offer['price'] ?? $offer['lowPrice'] ?? ''));
 
-                            if ($targetId && $offerId && $targetId === $offerId) {
-                                $data['price'] = floatval($offer['price'] ?? $offer['lowPrice'] ?? 0);
+                            if ($this->jsonLdUrlsMatch($offerUrl, $targetUrl, $targetId, $offerId)) {
+                                $data['price'] = $offerPrice;
                                 $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
+                                $matchedTargetItem = true;
                                 break;
                             }
 
-                            if ($targetUrl && isset($offer['url']) && str_contains($offer['url'], $targetUrl)) {
-                                $data['price'] = floatval($offer['price'] ?? $offer['lowPrice'] ?? 0);
-                                $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
-                                break;
-                            }
-
-                            $price = $offer['price'] ?? $offer['lowPrice'] ?? null;
-                            if ($price && floatval($price) > 0 && !$data['price']) {
-                                $data['price'] = floatval($price);
+                            if ($offerPrice > 0 && !$data['price']) {
+                                $data['price'] = $offerPrice;
                                 $data['currency'] = $offer['priceCurrency'] ?? $data['currency'];
                             } elseif (isset($offer['priceSpecification'])) {
                                 $spec = is_array($offer['priceSpecification']) && !isset($offer['priceSpecification']['price'])
                                     ? $offer['priceSpecification'][0]
                                     : $offer['priceSpecification'];
                                 if (isset($spec['price'])) {
-                                    $data['price'] = floatval($spec['price']);
+                                    $specPrice = $this->normalizePriceAmount((string)$spec['price']);
+                                    if ($specPrice <= 0) {
+                                        continue;
+                                    }
+
+                                    if (!$data['price']) {
+                                        $data['price'] = $specPrice;
+                                    }
                                     $data['currency'] = $spec['priceCurrency'] ?? $data['currency'];
                                 }
                             }
@@ -483,6 +533,98 @@ class ScraperService {
             }
         }
         return $data;
+    }
+
+    private function mergeJsonLdItemData(array &$data, array $item, bool $overrideExisting = false): void {
+        $itemData = [
+            'title' => $item['name'] ?? null,
+            'description' => $item['description'] ?? null,
+            'image' => $this->extractJsonLdImage($item['image'] ?? null),
+        ];
+
+        foreach ($itemData as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            if ($overrideExisting || empty($data[$key])) {
+                $data[$key] = $value;
+            }
+        }
+    }
+
+    private function extractJsonLdImage($image): ?string {
+        if (!$image) {
+            return null;
+        }
+
+        if (is_array($image)) {
+            $firstImage = $image[0] ?? null;
+            if (is_array($firstImage)) {
+                return $firstImage['contentURL'] ?? $firstImage['url'] ?? null;
+            }
+
+            return is_string($firstImage) ? $firstImage : null;
+        }
+
+        return is_string($image) ? $image : null;
+    }
+
+    private function jsonLdItemMatchesTarget(array $item, ?string $targetUrl, ?string $targetId): bool {
+        if ($targetUrl && isset($item['url']) && is_string($item['url'])) {
+            $itemId = $this->getProductId($item['url']);
+            if ($this->jsonLdUrlsMatch($item['url'], $targetUrl, $targetId, $itemId)) {
+                return true;
+            }
+        }
+
+        if (!isset($item['offers'])) {
+            return false;
+        }
+
+        $offers = is_array($item['offers']) && !isset($item['offers']['price']) && !isset($item['offers']['lowPrice']) ? $item['offers'] : [$item['offers']];
+        foreach ($offers as $offer) {
+            if (!is_array($offer) || !isset($offer['url']) || !is_string($offer['url'])) {
+                continue;
+            }
+
+            $offerId = $this->getProductId($offer['url']);
+            if ($this->jsonLdUrlsMatch($offer['url'], $targetUrl, $targetId, $offerId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function jsonLdUrlsMatch(?string $candidateUrl, ?string $targetUrl, ?string $targetId, ?string $candidateId = null): bool {
+        if (!$candidateUrl || !$targetUrl) {
+            return false;
+        }
+
+        if ($targetId) {
+            $candidateId = $candidateId ?: $this->getProductId($candidateUrl);
+            if ($candidateId && $candidateId === $targetId) {
+                return true;
+            }
+        }
+
+        if ($candidateUrl === $targetUrl) {
+            return true;
+        }
+
+        $candidateParts = parse_url($candidateUrl);
+        $targetParts = parse_url($targetUrl);
+        if (!$candidateParts || !$targetParts) {
+            return false;
+        }
+
+        $candidateHost = strtolower($candidateParts['host'] ?? '');
+        $targetHost = strtolower($targetParts['host'] ?? '');
+        $candidatePath = rtrim($candidateParts['path'] ?? '', '/');
+        $targetPath = rtrim($targetParts['path'] ?? '', '/');
+
+        return $candidateHost !== '' && $candidateHost === $targetHost && $candidatePath !== '' && $candidatePath === $targetPath;
     }
 
     private function cleanHtml(string $html): string {
