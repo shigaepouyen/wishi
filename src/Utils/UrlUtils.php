@@ -79,6 +79,7 @@ class UrlUtils {
         if (str_contains($host, 'fnac.')) return 'Fnac';
         if (str_contains($host, 'vinted.')) return 'Vinted';
         if (str_contains($host, 'popmart.')) return 'Pop Mart';
+        if (str_contains($host, 'sugoishop.')) return 'Sugoi Shop';
 
         // Fallback sur le nom de domaine principal sans l'extension
         $parts = explode('.', $host);

@@ -11,6 +11,9 @@ class ScraperService {
     
     protected $client;
 
+    private const TIGER_PROTECT_MAX_CANDIDATE = 2000;
+    private const TIGER_PROTECT_MAX_HASH_CHAIN_LENGTH = 4;
+
     public function __construct() {
         $this->client = new Client([
             'timeout' => 20,
@@ -66,10 +69,22 @@ class ScraperService {
                 $finalUrl = end($history);
             }
 
+            $html = (string)$response->getBody();
+
+            if ($this->isTigerProtectChallenge($statusCode, $html)) {
+                $solvedPage = $this->solveTigerProtectChallenge($finalUrl, $html);
+                if (!$solvedPage) {
+                    throw new \Exception("Le site est protégé par un contrôle JavaScript anti-bot. Veuillez remplir le formulaire manuellement.");
+                }
+
+                $response = $solvedPage['response'];
+                $statusCode = $response->getStatusCode();
+                $finalUrl = $solvedPage['final_url'];
+                $html = $solvedPage['html'];
+            }
+
             // Nettoyage de l'URL Amazon
             $url = UrlUtils::cleanAmazonUrl($finalUrl);
-
-            $html = (string)$response->getBody();
 
             // Extraction OpenGraph précoce (souvent présent même sur les pages de redirection/captcha)
             $ogData = $this->extractOpenGraphData($html);
@@ -524,5 +539,443 @@ class ScraperService {
             }
         }
         return null;
+    }
+
+    private function isTigerProtectChallenge(int $statusCode, string $html): bool {
+        if ($statusCode !== 503) {
+            return false;
+        }
+
+        return str_contains($html, '/o2s-cgi/security-challenge')
+            && str_contains($html, 'challengeHash')
+            && (str_contains($html, 'Tiger Protect') || str_contains($html, 'o2switch'));
+    }
+
+    private function solveTigerProtectChallenge(string $challengeUrl, string $challengeHtml): ?array {
+        $challengeHash = $this->extractTigerProtectChallengeHash($challengeHtml);
+        if (!$challengeHash) {
+            return null;
+        }
+
+        $challengeEndpoint = $this->buildTigerProtectChallengeEndpoint($challengeUrl);
+        if (!$challengeEndpoint) {
+            return null;
+        }
+
+        $challengeResponse = $this->client->post($challengeEndpoint . '?a=get-chl', [
+            'http_errors' => false,
+            'headers' => [
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Referer' => $challengeUrl,
+            ],
+            'form_params' => [
+                'chl-type' => 'js',
+                'chl-hash' => $challengeHash,
+            ],
+        ]);
+
+        $challengePayload = json_decode((string)$challengeResponse->getBody(), true);
+        $payload = $challengePayload['payload'] ?? null;
+        if (!$payload) {
+            return null;
+        }
+
+        $challengeData = $this->extractTigerProtectChallengeData($payload);
+        if (!$challengeData) {
+            return null;
+        }
+
+        $verifyResponse = $this->client->post($challengeEndpoint . '?a=verify-response', [
+            'http_errors' => false,
+            'headers' => [
+                'Referer' => $challengeUrl,
+            ],
+            'form_params' => [
+                'chl-type' => 'js',
+                'chl-hash' => $challengeHash,
+                'chl-current-url' => $challengeUrl,
+                'js-chl-response' => (string)$challengeData['response'],
+                'js-chl-id' => $challengeData['id'],
+            ],
+        ]);
+
+        // Certains challenges renvoient encore la page WAF ici; seule la requête suivante valide le cookie.
+        $pageResponse = $this->client->get($challengeUrl, [
+            'http_errors' => false,
+            'headers' => [
+                'Referer' => $challengeUrl,
+            ],
+            'curl' => [
+                CURLOPT_MAXREDIRS => 30,
+            ],
+        ]);
+
+        $finalUrl = $challengeUrl;
+        if ($pageResponse->hasHeader('X-GUZZLE-REDIRECT-HISTORY')) {
+            $history = $pageResponse->getHeader('X-GUZZLE-REDIRECT-HISTORY');
+            $finalUrl = end($history);
+        }
+
+        $html = (string)$pageResponse->getBody();
+        if ($this->isTigerProtectChallenge($pageResponse->getStatusCode(), $html)) {
+            return null;
+        }
+
+        return [
+            'response' => $pageResponse,
+            'final_url' => $finalUrl,
+            'html' => $html,
+            'verify_status' => $verifyResponse->getStatusCode(),
+        ];
+    }
+
+    private function extractTigerProtectChallengeHash(string $html): ?string {
+        if (preg_match("/const challengeHash = '([^']+)'/", $html, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
+    }
+
+    private function buildTigerProtectChallengeEndpoint(string $challengeUrl): ?string {
+        $parts = parse_url($challengeUrl);
+        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+
+        return $parts['scheme'] . '://' . $parts['host'] . '/o2s-cgi/security-challenge';
+    }
+
+    private function extractTigerProtectChallengeData(string $payload): ?array {
+        if (!preg_match('/var\s+[A-Za-z]+\s*=\s*(.*?);\s*var\s+[A-Za-z]+\s*=\s*(.*?);\s*var\s+[A-Za-z]+\s*=\s*\(function\(\)/s', $payload, $matches)) {
+            return null;
+        }
+
+        try {
+            $challengeId = $this->evaluateTigerProtectExpression($matches[1]);
+            $targetHash = strtolower($this->evaluateTigerProtectExpression($matches[2]));
+        } catch (\RuntimeException $e) {
+            return null;
+        }
+
+        if (!$challengeId || !preg_match('/^[a-f0-9]{6,}$/i', $challengeId)) {
+            return null;
+        }
+        if (!preg_match('/^(?:[a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64})$/', $targetHash)) {
+            return null;
+        }
+
+        $response = $this->computeTigerProtectResponse($targetHash);
+        if ($response === null) {
+            return null;
+        }
+
+        return [
+            'id' => $challengeId,
+            'target_hash' => $targetHash,
+            'response' => $response,
+        ];
+    }
+
+    private function computeTigerProtectResponse(string $targetHash): ?int {
+        $hashChains = $this->buildTigerProtectHashChains($targetHash);
+        if (empty($hashChains)) {
+            return null;
+        }
+
+        for ($candidate = 0; $candidate <= self::TIGER_PROTECT_MAX_CANDIDATE; $candidate++) {
+            foreach ($hashChains as $hashChain) {
+                $currentHash = (string)$candidate;
+                foreach ($hashChain as $algorithm) {
+                    $currentHash = hash($algorithm, $currentHash);
+                }
+
+                if ($currentHash === $targetHash) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function buildTigerProtectHashChains(string $targetHash): array {
+        $finalAlgorithm = $this->detectTigerProtectHashAlgorithm($targetHash);
+        if (!$finalAlgorithm) {
+            return [];
+        }
+
+        $algorithms = ['md5', 'sha1', 'sha256'];
+        $chains = [];
+
+        for ($length = 1; $length <= self::TIGER_PROTECT_MAX_HASH_CHAIN_LENGTH; $length++) {
+            $this->buildTigerProtectHashChainsRecursive($chains, [], $length, $algorithms, $finalAlgorithm);
+        }
+
+        return $chains;
+    }
+
+    private function buildTigerProtectHashChainsRecursive(array &$chains, array $currentChain, int $targetLength, array $algorithms, string $finalAlgorithm): void {
+        if (count($currentChain) === $targetLength) {
+            if (($currentChain[$targetLength - 1] ?? null) === $finalAlgorithm) {
+                $chains[] = $currentChain;
+            }
+            return;
+        }
+
+        foreach ($algorithms as $algorithm) {
+            $nextChain = $currentChain;
+            $nextChain[] = $algorithm;
+            $this->buildTigerProtectHashChainsRecursive($chains, $nextChain, $targetLength, $algorithms, $finalAlgorithm);
+        }
+    }
+
+    private function detectTigerProtectHashAlgorithm(string $targetHash): ?string {
+        return match (strlen($targetHash)) {
+            32 => 'md5',
+            40 => 'sha1',
+            64 => 'sha256',
+            default => null,
+        };
+    }
+
+    private function evaluateTigerProtectExpression(string $expression): string {
+        $expression = preg_replace('/\/\*.*?\*\//s', '', $expression);
+        do {
+            $previousExpression = $expression;
+            $expression = preg_replace('/\(\s*function\s*\(\)\s*\{\s*return\s*(.*?);\s*\}\s*\)\s*\(\s*\)/s', '($1)', $expression);
+        } while ($expression !== $previousExpression);
+
+        $tokens = $this->tokenizeTigerProtectExpression($expression);
+        $index = 0;
+        $value = $this->parseTigerProtectConcat($tokens, $index);
+
+        if ($index !== count($tokens)) {
+            throw new \RuntimeException('Expression Tiger Protect incomplète.');
+        }
+
+        return $this->stringifyTigerProtectValue($value);
+    }
+
+    private function tokenizeTigerProtectExpression(string $expression): array {
+        $tokens = [];
+        $length = strlen($expression);
+        $offset = 0;
+
+        while ($offset < $length) {
+            $char = $expression[$offset];
+
+            if (ctype_space($char)) {
+                $offset++;
+                continue;
+            }
+
+            if (in_array($char, ['+', '.', '[', ']', '(', ')', ','], true)) {
+                $tokens[] = ['type' => $char, 'value' => $char];
+                $offset++;
+                continue;
+            }
+
+            if (in_array($char, ["'", '"', '`'], true)) {
+                [$value, $offset] = $this->readTigerProtectStringToken($expression, $offset);
+                $tokens[] = ['type' => 'string', 'value' => $value];
+                continue;
+            }
+
+            if (ctype_digit($char)) {
+                $start = $offset;
+                while ($offset < $length && ctype_digit($expression[$offset])) {
+                    $offset++;
+                }
+                $tokens[] = ['type' => 'string', 'value' => substr($expression, $start, $offset - $start)];
+                continue;
+            }
+
+            if (preg_match('/[A-Za-z_$]/', $char) === 1) {
+                $start = $offset;
+                while ($offset < $length && preg_match('/[A-Za-z0-9_$]/', $expression[$offset]) === 1) {
+                    $offset++;
+                }
+                $tokens[] = ['type' => 'identifier', 'value' => substr($expression, $start, $offset - $start)];
+                continue;
+            }
+
+            throw new \RuntimeException("Token Tiger Protect inattendu: {$char}");
+        }
+
+        return $tokens;
+    }
+
+    private function readTigerProtectStringToken(string $expression, int $offset): array {
+        $delimiter = $expression[$offset];
+        $offset++;
+        $length = strlen($expression);
+        $value = '';
+
+        while ($offset < $length) {
+            $char = $expression[$offset];
+            if ($char === $delimiter) {
+                return [$value, $offset + 1];
+            }
+
+            if ($char === '\\') {
+                $offset++;
+                if ($offset >= $length) {
+                    break;
+                }
+
+                $escaped = $expression[$offset];
+                if ($escaped === 'x' && $offset + 2 < $length) {
+                    $hex = substr($expression, $offset + 1, 2);
+                    $value .= chr((int)hexdec($hex));
+                    $offset += 3;
+                    continue;
+                }
+
+                $value .= match ($escaped) {
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    default => $escaped,
+                };
+                $offset++;
+                continue;
+            }
+
+            $value .= $char;
+            $offset++;
+        }
+
+        throw new \RuntimeException('Chaîne Tiger Protect non terminée.');
+    }
+
+    private function parseTigerProtectConcat(array $tokens, int &$index) {
+        $value = $this->parseTigerProtectPostfix($tokens, $index);
+
+        while ($index < count($tokens) && $tokens[$index]['type'] === '+') {
+            $index++;
+            $right = $this->parseTigerProtectPostfix($tokens, $index);
+            $value = $this->stringifyTigerProtectValue($value) . $this->stringifyTigerProtectValue($right);
+        }
+
+        return $value;
+    }
+
+    private function parseTigerProtectPostfix(array $tokens, int &$index) {
+        $value = $this->parseTigerProtectPrimary($tokens, $index);
+
+        while ($index < count($tokens)) {
+            $type = $tokens[$index]['type'];
+
+            if ($type === '.') {
+                $index++;
+                $property = $this->expectTigerProtectToken($tokens, $index, 'identifier')['value'];
+                $value = $this->getTigerProtectProperty($value, $property);
+                continue;
+            }
+
+            if ($type === '[') {
+                $index++;
+                $property = $this->stringifyTigerProtectValue($this->parseTigerProtectConcat($tokens, $index));
+                $this->expectTigerProtectToken($tokens, $index, ']');
+                $value = $this->getTigerProtectProperty($value, $property);
+                continue;
+            }
+
+            if ($type === '(') {
+                $index++;
+                $arguments = [];
+                if ($index < count($tokens) && $tokens[$index]['type'] !== ')') {
+                    $arguments[] = $this->parseTigerProtectConcat($tokens, $index);
+                    while ($index < count($tokens) && $tokens[$index]['type'] === ',') {
+                        $index++;
+                        $arguments[] = $this->parseTigerProtectConcat($tokens, $index);
+                    }
+                }
+                $this->expectTigerProtectToken($tokens, $index, ')');
+                $value = $this->callTigerProtectValue($value, $arguments);
+                continue;
+            }
+
+            break;
+        }
+
+        return $value;
+    }
+
+    private function parseTigerProtectPrimary(array $tokens, int &$index) {
+        $token = $tokens[$index] ?? null;
+        if (!$token) {
+            throw new \RuntimeException('Expression Tiger Protect vide.');
+        }
+
+        if ($token['type'] === 'string') {
+            $index++;
+            return $token['value'];
+        }
+
+        if ($token['type'] === 'identifier') {
+            $index++;
+            return $this->resolveTigerProtectIdentifier($token['value']);
+        }
+
+        if ($token['type'] === '(') {
+            $index++;
+            $value = $this->parseTigerProtectConcat($tokens, $index);
+            $this->expectTigerProtectToken($tokens, $index, ')');
+            return $value;
+        }
+
+        throw new \RuntimeException('Expression Tiger Protect invalide.');
+    }
+
+    private function expectTigerProtectToken(array $tokens, int &$index, string $expectedType): array {
+        $token = $tokens[$index] ?? null;
+        if (!$token || $token['type'] !== $expectedType) {
+            throw new \RuntimeException("Token Tiger Protect attendu: {$expectedType}");
+        }
+
+        $index++;
+        return $token;
+    }
+
+    private function resolveTigerProtectIdentifier(string $identifier) {
+        return match ($identifier) {
+            'window' => ['kind' => 'window'],
+            'String' => ['kind' => 'callable', 'name' => 'String'],
+            default => throw new \RuntimeException("Identifiant Tiger Protect non supporté: {$identifier}"),
+        };
+    }
+
+    private function getTigerProtectProperty($value, string $property) {
+        if (is_array($value) && ($value['kind'] ?? null) === 'window' && $property === 'String') {
+            return ['kind' => 'callable', 'name' => 'String'];
+        }
+
+        if (is_array($value) && ($value['kind'] ?? null) === 'callable' && $value['name'] === 'String' && $property === 'fromCharCode') {
+            return ['kind' => 'callable', 'name' => 'String.fromCharCode'];
+        }
+
+        throw new \RuntimeException("Propriété Tiger Protect non supportée: {$property}");
+    }
+
+    private function callTigerProtectValue($value, array $arguments) {
+        if (!is_array($value) || ($value['kind'] ?? null) !== 'callable') {
+            throw new \RuntimeException('Appel Tiger Protect non supporté.');
+        }
+
+        return match ($value['name']) {
+            'String' => isset($arguments[0]) ? $this->stringifyTigerProtectValue($arguments[0]) : '',
+            'String.fromCharCode' => mb_chr((int)$this->stringifyTigerProtectValue($arguments[0] ?? '0')),
+            default => throw new \RuntimeException("Callable Tiger Protect non supporté: {$value['name']}"),
+        };
+    }
+
+    private function stringifyTigerProtectValue($value): string {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        throw new \RuntimeException('Valeur Tiger Protect non sérialisable.');
     }
 }
