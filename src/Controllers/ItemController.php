@@ -7,6 +7,12 @@ use App\Utils\CurrencyUtils;
 use PDO;
 
 class ItemController {
+
+    private function normalizeComparableUrl(string $url): string {
+        $url = UrlUtils::cleanAmazonUrl($url);
+        $url = UrlUtils::cleanAliExpressUrl($url);
+        return $url;
+    }
     
     private function normalizeCategory(?string $category): string {
         if (!$category) return 'Divers';
@@ -22,11 +28,11 @@ class ItemController {
     public function isDuplicate(int $listId, string $url, ?int $excludeId = null): bool {
         if (empty($url)) return false;
 
-        $url = UrlUtils::cleanAmazonUrl($url);
+        $normalizedUrl = $this->normalizeComparableUrl($url);
         $db = Database::getConnection();
 
-        $query = "SELECT COUNT(*) FROM items WHERE list_id = ? AND url = ?";
-        $params = [$listId, $url];
+        $query = "SELECT url FROM items WHERE list_id = ?";
+        $params = [$listId];
 
         if ($excludeId) {
             $query .= " AND id != ?";
@@ -35,7 +41,13 @@ class ItemController {
 
         $stmt = $db->prepare($query);
         $stmt->execute($params);
-        return (int)$stmt->fetchColumn() > 0;
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $existingUrl) {
+            if ($this->normalizeComparableUrl((string)$existingUrl) === $normalizedUrl) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function save() {

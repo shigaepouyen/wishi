@@ -10,14 +10,17 @@ use GuzzleHttp\Exception\RequestException;
 class ScraperService {
     
     protected $client;
+    protected $aliExpressClient;
+    protected $cookieJar;
 
     private const TIGER_PROTECT_MAX_CANDIDATE = 2000;
     private const TIGER_PROTECT_MAX_HASH_CHAIN_LENGTH = 4;
 
     public function __construct() {
+        $this->cookieJar = new CookieJar();
         $this->client = new Client([
             'timeout' => 20,
-            'cookies' => true,
+            'cookies' => $this->cookieJar,
             'allow_redirects' => [
                 'max' => 30,
                 'track_redirects' => true
@@ -34,10 +37,27 @@ class ScraperService {
                 CURLOPT_AUTOREFERER => true,
             ]
         ]);
+
+        $this->aliExpressClient = new Client([
+            'timeout' => 20,
+            'cookies' => $this->cookieJar,
+            'allow_redirects' => [
+                'max' => 10,
+                'track_redirects' => true
+            ],
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            ],
+            'curl' => [
+                CURLOPT_AUTOREFERER => true,
+            ]
+        ]);
     }
 
     public function getLinkData(string $url) {
         try {
+            $inputUrl = $url;
             // Pour AliExpress et Etsy on évite le Referer google qui peut déclencher des erreurs ou redirections
             $headers = [];
             if (!str_contains($url, 'aliexpress.com') && !str_contains($url, 'etsy.com')) {
@@ -85,6 +105,7 @@ class ScraperService {
 
             // Nettoyage de l'URL Amazon
             $url = UrlUtils::cleanAmazonUrl($finalUrl);
+            $url = UrlUtils::cleanAliExpressUrl($url);
 
             // Extraction OpenGraph précoce (souvent présent même sur les pages de redirection/captcha)
             $ogData = $this->extractOpenGraphData($html);
@@ -135,34 +156,41 @@ class ScraperService {
             $description = $ldData['description'] ?: $description;
             $image = $ldData['image'] ?: $image;
 
+            $aliExpressData = [];
+            if (str_contains($url, 'aliexpress.')) {
+                $aliExpressData = $this->extractAliExpressData($html, $finalUrl, $inputUrl);
+                $title = ($aliExpressData['title'] ?? '') ?: $title;
+                $description = ($aliExpressData['description'] ?? '') ?: $description;
+                $image = ($aliExpressData['image'] ?? '') ?: $image;
+                $url = $aliExpressData['resolved_url'] ?? $url;
+            }
+
             // Fallbacks manuels via Meta Tags si nécessaire
             if (!$title && preg_match('/<title>(.*?)<\/title>/is', $html, $matches)) {
                 $title = html_entity_decode(trim($matches[1]));
             }
             if (!$description) {
-                if (preg_match('/<meta.*?name=["\']description["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
-                    preg_match('/<meta.*?content=["\'](.*?)["\'].*?name=["\']description["\']/is', $html, $matches)) {
-                    $description = html_entity_decode(trim($matches[1]));
-                }
+                $description = $this->extractMetaContent($html, 'description', ['name']) ?? '';
             }
             // Fallback pour Pop Mart et autres structures SPA sans meta description utile
             if ((!$description || strlen($description) < 50) && preg_match('/<pre[^>]*class="[^"]*Desc[^"]*"[^>]*>(.*?)<\/pre>/is', $html, $matches)) {
                 $description = html_entity_decode(trim($matches[1]));
             }
             if (!$description) {
-                if (preg_match('/<meta.*?property=["\']og:description["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
-                    preg_match('/<meta.*?content=["\'](.*?)["\'].*?property=["\']og:description["\']/is', $html, $matches)) {
-                    $description = html_entity_decode(trim($matches[1]));
-                }
+                $description = $this->extractMetaContent($html, 'og:description', ['property']) ?? '';
             }
             if (!$image) {
-                if (preg_match('/<meta.*?property=["\']og:image["\'].*?content=["\'](.*?)["\']/is', $html, $matches) ||
-                    preg_match('/<meta.*?content=["\'](.*?)["\'].*?property=["\']og:image["\']/is', $html, $matches)) {
-                    $image = trim($matches[1]);
-                }
+                $image = $this->extractMetaContent($html, 'og:image', ['property']) ?? '';
+            }
+
+            if (str_contains($url, 'aliexpress.') && $this->isGenericAliExpressDescription($description)) {
+                $description = $aliExpressData['description'] ?? '';
             }
 
             // Nettoyage final
+            if (str_contains($url, 'aliexpress.')) {
+                $title = $this->cleanAliExpressTitle($title);
+            }
             $title = trim(str_replace(["\n", "\r"], ' ', $title));
             $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 2000, "...");
 
@@ -176,16 +204,23 @@ class ScraperService {
                 $priceData['currency'] = $ldData['currency'] ?: $priceData['currency'];
             }
 
+            if (($aliExpressData['price']['amount'] ?? 0) > 0) {
+                $priceData['amount'] = $aliExpressData['price']['amount'];
+                $priceData['currency'] = $aliExpressData['price']['currency'] ?: $priceData['currency'];
+            }
+
             $amazonImages = $this->extractAmazonImages($html);
             $amazonTitle = $this->extractAmazonTitle($html);
             $aliexpressImages = $this->extractAliexpressImages($html);
             $etsyImages = $this->extractEtsyImages($html);
+            $aliExpressApiImages = $aliExpressData['images'] ?? [];
 
             // On agrège les images candidates
             $images = [];
             if ($image) $images[] = $image;
             if (!empty($amazonImages)) $images = array_merge($images, $amazonImages);
             if (!empty($aliexpressImages)) $images = array_merge($images, $aliexpressImages);
+            if (!empty($aliExpressApiImages)) $images = array_merge($images, $aliExpressApiImages);
             if (!empty($etsyImages)) $images = array_merge($images, $etsyImages);
 
             // On enlève les doublons et on s'assure que les URLs sont valides
@@ -214,12 +249,18 @@ class ScraperService {
                 return 0;
             });
 
+            $preserveSourceUrl = (bool)($aliExpressData['preserve_source_url'] ?? false);
+            $storedUrl = ($preserveSourceUrl && $inputUrl !== '') ? $inputUrl : $url;
+
             return [
                 'title'       => $amazonTitle ?: (($title && $title !== 'Sans titre') ? $title : ''),
                 'description' => $description ?: '',
                 'image'       => $images[0] ?? '', // Image par défaut
                 'images'      => $images,         // Toutes les images candidates
-                'url'         => $url,
+                'url'         => $storedUrl,
+                'source_url'  => $inputUrl,
+                'resolved_url'=> $url,
+                'preserve_source_url' => $preserveSourceUrl,
                 'price'       => [
                     'amount'   => $priceData['amount'] > 0 ? round($priceData['amount'], 2) : '',
                     'currency' => $priceData['currency'] ?: 'EUR'
@@ -277,8 +318,9 @@ class ScraperService {
         }
 
         // STRATÉGIE 2 : Meta tags spécifiques au prix
-        if (preg_match('/<meta.*?property=["\']product:price:amount["\'].*?content=["\'](.*?)["\']/is', $cleanHtml, $matches)) {
-            $amount = $this->normalizePriceAmount($matches[1]);
+        $metaPriceAmount = $this->extractMetaContent($cleanHtml, 'product:price:amount', ['property']);
+        if ($metaPriceAmount !== null) {
+            $amount = $this->normalizePriceAmount($metaPriceAmount);
             return [
                 'amount' => $amount,
                 'currency' => $detectedCurrency
@@ -315,8 +357,8 @@ class ScraperService {
 
     private function detectCurrency($html) {
         // STRATÉGIE 1 : Chercher dans les balises meta (plus fiable que le contenu global)
-        if (preg_match('/<meta.*?property=["\']og:price:currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return strtoupper(trim($m[1]));
-        if (preg_match('/<meta.*?name=["\']currency["\'].*?content=["\'](.*?)["\']/is', $html, $m)) return strtoupper(trim($m[1]));
+        if (($metaCurrency = $this->extractMetaContent($html, 'og:price:currency', ['property'])) !== null) return strtoupper(trim($metaCurrency));
+        if (($metaCurrency = $this->extractMetaContent($html, 'currency', ['name'])) !== null) return strtoupper(trim($metaCurrency));
 
         // STRATÉGIE 2 : Plateformes spécifiques
         if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return strtoupper(trim($m[1]));
@@ -385,6 +427,708 @@ class ScraperService {
         }
 
         return is_numeric($normalized) ? (float)$normalized : 0.0;
+    }
+
+    private function extractAliExpressData(string $html, string $url, string $sourceUrl = ''): array {
+        $fallbackData = $this->extractAliExpressHtmlFallbackData($html);
+        $productId = $this->extractAliExpressProductId($html, $url);
+        if (!$productId) {
+            return $fallbackData;
+        }
+
+        $extParams = $this->extractAliExpressExtParams($html, $url);
+        $localeConfig = $this->resolveAliExpressLocaleConfig($url, $extParams);
+        $resolvedUrl = $this->buildAliExpressResolvedUrl($html, $url, (string)$productId, $localeConfig);
+        $preserveSourceUrl = $this->shouldPreserveAliExpressSourceUrl($sourceUrl, $resolvedUrl);
+
+        $queryParams = [];
+        parse_str(parse_url($url, PHP_URL_QUERY) ?? '', $queryParams);
+
+        $productData = $this->fetchAliExpressProductData((string)$productId, $url, $localeConfig, $extParams, $queryParams);
+        if (!$productData) {
+            $fallbackData['resolved_url'] = $resolvedUrl;
+            $fallbackData['preserve_source_url'] = $preserveSourceUrl;
+            return $fallbackData;
+        }
+
+        $images = array_values(array_unique(array_filter(array_merge(
+            $this->extractAliExpressImagesFromApi($productData),
+            $fallbackData['images'] ?? []
+        ))));
+
+        $title = $this->extractAliExpressTitleFromApi($productData) ?: ($fallbackData['title'] ?? '');
+        $description = $this->extractAliExpressDescription(
+            $this->getAliExpressComponent($productData, ['DESC', 'descComponent', 'descriptionComponent']),
+            $url
+        );
+        $price = $this->extractAliExpressPriceData(
+            $this->getAliExpressComponent($productData, ['PRICE', 'priceComponent', 'price'])
+        );
+
+        return [
+            'title' => $title,
+            'description' => $description ?: ($fallbackData['description'] ?? ''),
+            'image' => $images[0] ?? ($fallbackData['image'] ?? ''),
+            'images' => $images,
+            'resolved_url' => $resolvedUrl,
+            'preserve_source_url' => $preserveSourceUrl,
+            'price' => $price,
+        ];
+    }
+
+    private function buildAliExpressResolvedUrl(string $html, string $url, string $productId, array $localeConfig): string {
+        $candidates = array_filter([
+            $this->extractAliExpressMetaContent($html, 'og:url'),
+            $this->extractAliExpressMetaContent($html, 'al:android:url'),
+            $this->extractAliExpressMetaContent($html, 'al:iphone:url'),
+            $url,
+        ]);
+
+        foreach ($candidates as $candidate) {
+            $cleanCandidate = UrlUtils::cleanAliExpressUrl($candidate);
+            if (UrlUtils::extractAliExpressProductId($cleanCandidate) === $productId) {
+                return $cleanCandidate;
+            }
+        }
+
+        return 'https://' . $this->getAliExpressHostForSite($localeConfig['site'] ?? 'glo') . '/item/' . $productId . '.html';
+    }
+
+    private function shouldPreserveAliExpressSourceUrl(string $sourceUrl, string $resolvedUrl): bool {
+        if ($sourceUrl === '') {
+            return false;
+        }
+
+        $sourceHost = strtolower(parse_url($sourceUrl, PHP_URL_HOST) ?? '');
+        $resolvedHost = strtolower(parse_url($resolvedUrl, PHP_URL_HOST) ?? '');
+
+        if ($sourceHost === 'a.aliexpress.com') {
+            return true;
+        }
+
+        return $sourceHost !== '' && $resolvedHost !== '' && $sourceHost !== $resolvedHost;
+    }
+
+    private function getAliExpressHostForSite(string $site): string {
+        return match (strtolower($site)) {
+            'fra' => 'fr.aliexpress.com',
+            'esp' => 'es.aliexpress.com',
+            'deu' => 'de.aliexpress.com',
+            'ita' => 'it.aliexpress.com',
+            'nld' => 'nl.aliexpress.com',
+            'pol' => 'pl.aliexpress.com',
+            'bra' => 'pt.aliexpress.com',
+            default => 'www.aliexpress.com',
+        };
+    }
+
+    private function extractAliExpressHtmlFallbackData(string $html): array {
+        $ogData = $this->extractOpenGraphData($html);
+        $images = $this->extractAliexpressImages($html);
+        $primaryImage = $ogData['image'] ?? '';
+
+        if ($primaryImage !== '' && !in_array($primaryImage, $images, true)) {
+            array_unshift($images, $primaryImage);
+        }
+
+        $description = $ogData['description'] ?? '';
+        if ($this->isGenericAliExpressDescription($description)) {
+            $description = '';
+        }
+
+        return [
+            'title' => $this->cleanAliExpressTitle($ogData['title'] ?? ''),
+            'description' => $description,
+            'image' => $images[0] ?? '',
+            'images' => array_values(array_unique(array_filter($images))),
+            'price' => ['amount' => 0, 'currency' => $this->detectCurrency($html)],
+        ];
+    }
+
+    private function extractAliExpressProductId(string $html, string $url): ?string {
+        $candidates = array_filter([
+            $url,
+            $this->extractAliExpressMetaContent($html, 'og:url'),
+            $this->extractAliExpressMetaContent($html, 'al:android:url'),
+            $this->extractAliExpressMetaContent($html, 'al:iphone:url'),
+        ]);
+
+        foreach ($candidates as $candidate) {
+            $productId = UrlUtils::extractAliExpressProductId($candidate);
+            if ($productId) {
+                return $productId;
+            }
+        }
+
+        if (preg_match('/\/(?:item|i)\/(\d+)\.(?:html|htm)/i', $html, $matches)) {
+            return $matches[1];
+        }
+        if (preg_match('/(?:[?&]|^)productId=(\d+)/i', $html, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
+    }
+
+    private function extractAliExpressMetaContent(string $html, string $name): ?string {
+        return $this->extractMetaContent($html, $name, ['property', 'name']);
+    }
+
+    private function extractAliExpressExtParams(string $html, string $url): array {
+        if (preg_match('/window\._d_c_\.DCData\s*=\s*(\{.*?\})\s*;/s', $html, $matches)) {
+            $dcData = json_decode($matches[1], true);
+            if (is_array($dcData) && isset($dcData['extParams']) && is_array($dcData['extParams'])) {
+                return $dcData['extParams'];
+            }
+        }
+
+        $localeConfig = $this->resolveAliExpressLocaleConfig($url, []);
+
+        return [
+            'site' => $localeConfig['site'],
+            'crawler' => false,
+            'signedIn' => false,
+            'host' => parse_url($url, PHP_URL_HOST) ?: 'www.aliexpress.com',
+        ];
+    }
+
+    private function resolveAliExpressLocaleConfig(string $url, array $extParams): array {
+        $host = strtolower(parse_url($url, PHP_URL_HOST) ?? '');
+        $subdomain = explode('.', $host)[0] ?: 'www';
+
+        $hostMap = [
+            'fr' => ['lang' => 'fr_FR', 'country' => 'FR', 'site' => 'fra', 'currency' => 'EUR'],
+            'es' => ['lang' => 'es_ES', 'country' => 'ES', 'site' => 'esp', 'currency' => 'EUR'],
+            'de' => ['lang' => 'de_DE', 'country' => 'DE', 'site' => 'deu', 'currency' => 'EUR'],
+            'it' => ['lang' => 'it_IT', 'country' => 'IT', 'site' => 'ita', 'currency' => 'EUR'],
+            'nl' => ['lang' => 'nl_NL', 'country' => 'NL', 'site' => 'nld', 'currency' => 'EUR'],
+            'pt' => ['lang' => 'pt_BR', 'country' => 'BR', 'site' => 'bra', 'currency' => 'BRL'],
+            'pl' => ['lang' => 'pl_PL', 'country' => 'PL', 'site' => 'pol', 'currency' => 'PLN'],
+            'www' => ['lang' => 'en_US', 'country' => 'US', 'site' => 'glo', 'currency' => 'USD'],
+            'm' => ['lang' => 'en_US', 'country' => 'US', 'site' => 'glo', 'currency' => 'USD'],
+        ];
+        $siteMap = [
+            'fra' => $hostMap['fr'],
+            'esp' => $hostMap['es'],
+            'deu' => $hostMap['de'],
+            'ita' => $hostMap['it'],
+            'nld' => $hostMap['nl'],
+            'bra' => $hostMap['pt'],
+            'pol' => $hostMap['pl'],
+            'glo' => $hostMap['www'],
+        ];
+
+        if (isset($hostMap[$subdomain])) {
+            return $hostMap[$subdomain];
+        }
+
+        $site = $extParams['site'] ?? null;
+        if (is_string($site) && isset($siteMap[$site])) {
+            return $siteMap[$site];
+        }
+
+        return $hostMap['www'];
+    }
+
+    private function fetchAliExpressProductData(string $productId, string $url, array $localeConfig, array $extParams, array $queryParams): ?array {
+        foreach ($this->buildAliExpressApiRequests($productId, $localeConfig, $extParams, $queryParams) as $requestConfig) {
+            $payload = $this->requestAliExpressJsonp(
+                $requestConfig['endpoint'],
+                $requestConfig['api'],
+                $requestConfig['version'],
+                $requestConfig['data'],
+                $url
+            );
+
+            $productData = $this->extractAliExpressProductPayload($payload, $requestConfig['name']);
+            if ($productData) {
+                return $productData;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildAliExpressApiRequests(string $productId, array $localeConfig, array $extParams, array $queryParams): array {
+        $currency = $queryParams['currency'] ?? $localeConfig['currency'];
+        $country = $localeConfig['country'];
+        $province = $queryParams['province'] ?? '';
+        $city = $queryParams['city'] ?? '';
+        $channel = $queryParams['channel'] ?? '';
+        $pdpExt = $queryParams['pdp_ext_f'] ?? '';
+        $pdpNpi = $queryParams['pdp_npi'] ?? ($queryParams['pdpNPI'] ?? '');
+        $sourceType = $queryParams['sourceType'] ?? '';
+
+        return [
+            [
+                'name' => 'pc.query',
+                'endpoint' => 'https://acs.aliexpress.com/h5/mtop.aliexpress.pdp.pc.query/1.0/',
+                'api' => 'mtop.aliexpress.pdp.pc.query',
+                'version' => '1.0',
+                'data' => json_encode([
+                    'productId' => $productId,
+                    '_lang' => $localeConfig['lang'],
+                    '_currency' => $currency,
+                    'country' => $country,
+                    'province' => $province,
+                    'city' => $city,
+                    'channel' => $channel,
+                    'pdp_ext_f' => $pdpExt,
+                    'pdpNPI' => $pdpNpi,
+                    'sourceType' => $sourceType,
+                    'clientType' => 'pc',
+                    'ext' => json_encode($extParams, JSON_UNESCAPED_SLASHES),
+                ], JSON_UNESCAPED_SLASHES),
+            ],
+            [
+                'name' => 'choice.pc',
+                'endpoint' => 'https://acs.aliexpress.com/h5/mtop.aliexpress.itemdetail.pc.asyncPCDetail/1.0/',
+                'api' => 'mtop.aliexpress.itemdetail.pc.asyncPCDetail',
+                'version' => '1.0',
+                'data' => json_encode([
+                    'productId' => $productId,
+                    'lang' => $localeConfig['lang'],
+                    'currency' => $currency,
+                    'country' => $country,
+                    'province' => $province,
+                    'city' => $city,
+                    'channel' => $channel,
+                    'sourceType' => $sourceType,
+                    'ext' => json_encode(array_filter(array_merge($extParams, [
+                        'pdp_ext_f' => $pdpExt,
+                        'pdpNPI' => $pdpNpi,
+                    ]), fn($value) => $value !== '' && $value !== null), JSON_UNESCAPED_SLASHES),
+                ], JSON_UNESCAPED_SLASHES),
+            ],
+            [
+                'name' => 'msite',
+                'endpoint' => 'https://acs.aliexpress.com/h5/mtop.aliexpress.itemdetail.msite/1.0/',
+                'api' => 'mtop.aliexpress.itemdetail.msite',
+                'version' => '1.0',
+                'data' => json_encode([
+                    'productId' => $productId,
+                    'lang' => $localeConfig['lang'],
+                    'currency' => $currency,
+                    'province' => $province,
+                    'city' => $city,
+                    'shipToState' => $province,
+                    'shipToCity' => $city,
+                    'recgBizScene' => 'msite#GlobalDetail',
+                    'channel' => $channel,
+                    'pdp_ext_f' => $pdpExt,
+                    'pdpNPI' => $pdpNpi,
+                    'sourceType' => $sourceType,
+                    'baseMaterialId' => $queryParams['grouponBaseMaterialId'] ?? '',
+                    'mId' => $queryParams['grouponMId'] ?? '',
+                ], JSON_UNESCAPED_SLASHES),
+            ],
+        ];
+    }
+
+    private function extractAliExpressProductPayload(?array $payload, string $apiName): ?array {
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $candidates = match ($apiName) {
+            'pc.query' => [$payload['data']['result'] ?? null],
+            'choice.pc' => [$payload['data']['data'] ?? null],
+            'msite' => [$payload['data'] ?? null],
+            default => [],
+        };
+
+        $candidates = array_merge($candidates, [
+            $payload['data']['result'] ?? null,
+            $payload['data']['data'] ?? null,
+            $payload['data'] ?? null,
+        ]);
+
+        foreach ($candidates as $candidate) {
+            $productData = $this->findAliExpressProductData($candidate);
+            if ($productData) {
+                return $productData;
+            }
+        }
+
+        return null;
+    }
+
+    private function findAliExpressProductData($candidate, int $depth = 0): ?array {
+        if (!is_array($candidate) || $depth > 2) {
+            return null;
+        }
+
+        if ($this->looksLikeAliExpressProductData($candidate)) {
+            return $candidate;
+        }
+
+        foreach ($candidate as $value) {
+            if (!is_array($value)) {
+                continue;
+            }
+
+            $productData = $this->findAliExpressProductData($value, $depth + 1);
+            if ($productData) {
+                return $productData;
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeAliExpressProductData(array $candidate): bool {
+        $keys = array_map(static fn($key) => is_string($key) ? strtolower($key) : '', array_keys($candidate));
+        $markers = [
+            'product_title',
+            'price',
+            'pricecomponent',
+            'header_image_pc',
+            'header_image_mobile',
+            'imagecomponent',
+            'sku',
+            'desc',
+            'desccomponent',
+            'descriptioncomponent',
+            'titlecomponent',
+        ];
+
+        foreach ($markers as $marker) {
+            if (in_array($marker, $keys, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function requestAliExpressJsonp(string $endpoint, string $api, string $version, string $data, string $referer): ?array {
+        $response = $this->sendAliExpressJsonpRequest($endpoint, $api, $version, $data, $referer);
+        $payload = $this->decodeAliExpressJsonp((string)$response->getBody());
+
+        if ($this->isAliExpressTokenEmptyResponse($payload)) {
+            $response = $this->sendAliExpressJsonpRequest($endpoint, $api, $version, $data, $referer);
+            $payload = $this->decodeAliExpressJsonp((string)$response->getBody());
+        }
+
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $ret = $payload['ret'] ?? [];
+        $retString = is_array($ret) ? implode(',', $ret) : (string)$ret;
+        if (!str_contains($retString, 'SUCCESS')) {
+            return null;
+        }
+
+        return $payload;
+    }
+
+    private function sendAliExpressJsonpRequest(string $endpoint, string $api, string $version, string $data, string $referer) {
+        $appKey = '12574478';
+        $timestamp = (string)round(microtime(true) * 1000);
+        $token = $this->getAliExpressToken();
+        $sign = md5($token . '&' . $timestamp . '&' . $appKey . '&' . $data);
+
+        return $this->aliExpressClient->get($endpoint, [
+            'http_errors' => false,
+            'headers' => [
+                'Accept' => '*/*',
+                'Referer' => $referer,
+            ],
+            'query' => [
+                'jsv' => '2.5.1',
+                'appKey' => $appKey,
+                't' => $timestamp,
+                'sign' => $sign,
+                'api' => $api,
+                'v' => $version,
+                'type' => 'originaljsonp',
+                'dataType' => 'originaljsonp',
+                'timeout' => '15000',
+                'callback' => 'mtopjsonp1',
+                'data' => $data,
+            ],
+        ]);
+    }
+
+    private function getAliExpressToken(): string {
+        foreach ($this->cookieJar->toArray() as $cookie) {
+            if (($cookie['Name'] ?? null) === '_m_h5_tk') {
+                return explode('_', (string)$cookie['Value'])[0] ?? '';
+            }
+        }
+
+        return '';
+    }
+
+    private function decodeAliExpressJsonp(string $body): ?array {
+        $body = trim($body);
+        if ($body === '') {
+            return null;
+        }
+
+        if (preg_match('/^[^(]+\((.*)\)\s*$/s', $body, $matches)) {
+            $body = $matches[1];
+        }
+
+        $decoded = json_decode($body, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function isAliExpressTokenEmptyResponse(?array $payload): bool {
+        if (!is_array($payload)) {
+            return false;
+        }
+
+        $ret = $payload['ret'] ?? [];
+        $retString = is_array($ret) ? implode(',', $ret) : (string)$ret;
+
+        return str_contains($retString, 'FAIL_SYS_TOKEN_EMPTY');
+    }
+
+    private function getAliExpressComponent(array $productData, array $candidateKeys) {
+        foreach ($candidateKeys as $candidateKey) {
+            if (array_key_exists($candidateKey, $productData)) {
+                return $productData[$candidateKey];
+            }
+
+            foreach ($productData as $key => $value) {
+                if (is_string($key) && strtolower($key) === strtolower($candidateKey)) {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function extractAliExpressTitleFromApi(array $productData): string {
+        $titleComponent = $this->getAliExpressComponent($productData, ['PRODUCT_TITLE', 'productTitle', 'titleComponent']);
+        if (is_array($titleComponent)) {
+            foreach (['text', 'title', 'subject', 'displayTitle'] as $field) {
+                if (!empty($titleComponent[$field]) && is_string($titleComponent[$field])) {
+                    return $this->cleanAliExpressTitle($titleComponent[$field]);
+                }
+            }
+        }
+
+        if (is_string($titleComponent) && $titleComponent !== '') {
+            return $this->cleanAliExpressTitle($titleComponent);
+        }
+
+        foreach (['title', 'subject', 'name'] as $field) {
+            if (!empty($productData[$field]) && is_string($productData[$field])) {
+                return $this->cleanAliExpressTitle($productData[$field]);
+            }
+        }
+
+        return '';
+    }
+
+    private function extractAliExpressPriceData($priceComponent): array {
+        if (!is_array($priceComponent)) {
+            return ['amount' => 0, 'currency' => 'EUR'];
+        }
+
+        $nodes = [$priceComponent];
+
+        if (isset($priceComponent['targetSkuPriceInfo']) && is_array($priceComponent['targetSkuPriceInfo'])) {
+            array_unshift($nodes, $priceComponent['targetSkuPriceInfo']);
+        }
+
+        if (isset($priceComponent['skuPriceInfoMap']) && is_array($priceComponent['skuPriceInfoMap'])) {
+            foreach ($priceComponent['skuPriceInfoMap'] as $skuPriceInfo) {
+                if (is_array($skuPriceInfo)) {
+                    $nodes[] = $skuPriceInfo;
+                }
+            }
+        }
+
+        $currency = 'EUR';
+        foreach ($nodes as $node) {
+            foreach (['currency', 'currencyCode', 'priceCurrency'] as $field) {
+                if (!empty($node[$field]) && is_string($node[$field])) {
+                    $currency = strtoupper($node[$field]);
+                    break 2;
+                }
+            }
+
+            if (!empty($node['originalPrice']['currency']) && is_string($node['originalPrice']['currency'])) {
+                $currency = strtoupper($node['originalPrice']['currency']);
+                break;
+            }
+        }
+
+        $priceFields = [
+            'salePriceString',
+            'salePrice',
+            'salePriceLocal',
+            'formatedActivityPrice',
+            'formatedPrice',
+            'priceDisplay',
+            'discountPrice',
+            'activityPrice',
+            'minPrice',
+            'maxPrice',
+        ];
+
+        foreach ($nodes as $node) {
+            foreach ($priceFields as $field) {
+                if (empty($node[$field]) || !is_scalar($node[$field])) {
+                    continue;
+                }
+
+                $rawPrice = (string)$node[$field];
+                if ($field === 'salePriceLocal') {
+                    $rawPrice = (string)explode('|', $rawPrice)[0];
+                }
+
+                $amount = $this->normalizePriceAmount($rawPrice);
+                if ($amount > 0) {
+                    return ['amount' => $amount, 'currency' => $currency];
+                }
+            }
+
+            if (isset($node['originalPrice']) && is_array($node['originalPrice'])) {
+                foreach (['value', 'amount', 'formatedAmount', 'priceText'] as $field) {
+                    if (empty($node['originalPrice'][$field]) || !is_scalar($node['originalPrice'][$field])) {
+                        continue;
+                    }
+
+                    $amount = $this->normalizePriceAmount((string)$node['originalPrice'][$field]);
+                    if ($amount > 0) {
+                        return ['amount' => $amount, 'currency' => $currency];
+                    }
+                }
+            }
+        }
+
+        return ['amount' => 0, 'currency' => $currency];
+    }
+
+    private function extractAliExpressDescription($descComponent, string $url): string {
+        $descriptionUrl = null;
+        if (is_array($descComponent)) {
+            $descriptionUrl = $descComponent['nativeDescUrl'] ?? $descComponent['pcDescUrl'] ?? $descComponent['descriptionUrl'] ?? $descComponent['descUrl'] ?? null;
+        } elseif (is_string($descComponent) && $descComponent !== '') {
+            $descriptionUrl = $descComponent;
+        }
+
+        if (!is_string($descriptionUrl) || $descriptionUrl === '') {
+            return '';
+        }
+
+        $response = $this->aliExpressClient->get($descriptionUrl, [
+            'http_errors' => false,
+            'headers' => [
+                'Accept' => 'application/json,text/plain,*/*',
+                'Referer' => $url,
+            ],
+        ]);
+
+        if ($response->getStatusCode() >= 400) {
+            return '';
+        }
+
+        $payload = json_decode((string)$response->getBody(), true);
+        if (!is_array($payload) || !isset($payload['moduleList']) || !is_array($payload['moduleList'])) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($payload['moduleList'] as $module) {
+            if (($module['type'] ?? null) !== 'text') {
+                continue;
+            }
+
+            $content = trim(strip_tags(html_entity_decode((string)($module['data']['content'] ?? ''))));
+            if ($content === '' || preg_match('/^(NOTE|Détails du produit)$/iu', $content)) {
+                continue;
+            }
+
+            $parts[] = $content;
+            if (count($parts) >= 8) {
+                break;
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
+    private function extractAliExpressImagesFromApi(array $productData): array {
+        $images = [];
+        $imageComponents = array_filter([
+            $this->getAliExpressComponent($productData, ['HEADER_IMAGE_PC', 'headerImagePc', 'headerImageComponent']),
+            $this->getAliExpressComponent($productData, ['HEADER_IMAGE_MOBILE', 'headerImageMobile']),
+            $this->getAliExpressComponent($productData, ['imageComponent']),
+        ], static fn($component) => is_array($component));
+
+        foreach ($imageComponents as $component) {
+            $this->appendAliExpressImageUrls($images, $component);
+        }
+
+        if (!empty($productData['images'])) {
+            $this->appendAliExpressImageUrls($images, $productData['images']);
+        }
+
+        $skuComponent = $this->getAliExpressComponent($productData, ['SKU', 'skuComponent']);
+        if (is_array($skuComponent) && isset($skuComponent['skuProperties']) && is_array($skuComponent['skuProperties'])) {
+            foreach ($skuComponent['skuProperties'] as $skuProperty) {
+                if (!isset($skuProperty['skuPropertyValues']) || !is_array($skuProperty['skuPropertyValues'])) {
+                    continue;
+                }
+                foreach ($skuProperty['skuPropertyValues'] as $value) {
+                    $this->appendAliExpressImageUrls($images, $value);
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($images)));
+    }
+
+    private function appendAliExpressImageUrls(array &$images, $value): void {
+        if (is_string($value) && $value !== '') {
+            if (str_starts_with($value, '//')) {
+                $images[] = 'https:' . $value;
+            } elseif (preg_match('/^https?:\/\//i', $value)) {
+                $images[] = $value;
+            }
+            return;
+        }
+
+        if (!is_array($value)) {
+            return;
+        }
+
+        foreach (['imageUrl', 'url', 'imagePath', 'imgUrl', 'skuPropertyImagePath'] as $field) {
+            if (!empty($value[$field])) {
+                $this->appendAliExpressImageUrls($images, $value[$field]);
+            }
+        }
+
+        foreach (['imagePathList', 'currentSkuImages', 'imgList', 'mainImages', 'images', 'imageList'] as $field) {
+            if (!isset($value[$field]) || !is_array($value[$field])) {
+                continue;
+            }
+
+            foreach ($value[$field] as $nestedValue) {
+                $this->appendAliExpressImageUrls($images, $nestedValue);
+            }
+        }
+
+        foreach ($value as $key => $nestedValue) {
+            if (is_int($key)) {
+                $this->appendAliExpressImageUrls($images, $nestedValue);
+            }
+        }
+    }
+
+    private function cleanAliExpressTitle(string $title): string {
+        return trim((string)preg_replace('/\s*-\s*AliExpress(?:\s+\d+)?$/i', '', $title));
+    }
+
+    private function isGenericAliExpressDescription(string $description): bool {
+        return preg_match('/^Smarter Shopping,\s*Better Living!\s*Aliexpress\.com$/i', trim($description)) === 1;
     }
 
     private function extractAmazonImages($html) {
@@ -653,15 +1397,34 @@ class ScraperService {
         return $html;
     }
 
+    private function extractMetaContent(string $html, string $name, array $attributes = ['property', 'name']): ?string {
+        $quotedName = preg_quote($name, '/');
+
+        foreach ($attributes as $attribute) {
+            $quotedAttribute = preg_quote($attribute, '/');
+            $patterns = [
+                '/<meta\b[^>]*\b' . $quotedAttribute . '\s*=\s*(["\'])' . $quotedName . '\1[^>]*\bcontent\s*=\s*(["\'])(.*?)\2/is',
+                '/<meta\b[^>]*\bcontent\s*=\s*(["\'])(.*?)\1[^>]*\b' . $quotedAttribute . '\s*=\s*(["\'])' . $quotedName . '\3/is',
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $html, $matches)) {
+                    $content = $matches[count($matches) - 1] ?? null;
+                    if (is_string($content)) {
+                        return html_entity_decode(trim($content));
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     private function extractOpenGraphData($html) {
         $data = [];
-        // Support property="og:..." et name="og:..."
-        if (preg_match('/<meta.*?(?:property|name)=["\']og:title["\'].*?content=["\'](.*?)["\']/is', $html, $m)) $data['title'] = html_entity_decode(trim($m[1]));
-        if (preg_match('/<meta.*?(?:property|name)=["\']og:description["\'].*?content=["\'](.*?)["\']/is', $html, $m)) $data['description'] = html_entity_decode(trim($m[1]));
-        if (preg_match('/<meta.*?(?:property|name)=["\']og:image["\'].*?content=["\'](.*?)["\']/is', $html, $m)) $data['image'] = trim($m[1]);
-
-        // Fallback si content est avant property
-        if (empty($data['title']) && preg_match('/<meta.*?content=["\'](.*?)["\'].*?(?:property|name)=["\']og:title["\']/is', $html, $m)) $data['title'] = html_entity_decode(trim($m[1]));
+        $data['title'] = $this->extractMetaContent($html, 'og:title', ['property', 'name']) ?? null;
+        $data['description'] = $this->extractMetaContent($html, 'og:description', ['property', 'name']) ?? null;
+        $data['image'] = $this->extractMetaContent($html, 'og:image', ['property', 'name']) ?? null;
 
         return $data;
     }
@@ -672,13 +1435,8 @@ class ScraperService {
                 return $matches[1];
             }
         }
-        if (str_contains($url, 'aliexpress.')) {
-            if (preg_match('/\/item\/(\d+)\.html/i', $url, $matches)) {
-                return $matches[1];
-            }
-            if (preg_match('/productId=(\d+)/i', $url, $matches)) {
-                return $matches[1];
-            }
+        if (str_contains($url, 'aliexpress.') || str_starts_with($url, 'aliexpress://') || str_starts_with($url, '//')) {
+            return UrlUtils::extractAliExpressProductId($url);
         }
         return null;
     }

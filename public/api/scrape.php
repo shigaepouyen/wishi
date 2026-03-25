@@ -41,7 +41,8 @@ try {
         // Détection de doublons si list_id est fourni
         $isDuplicate = false;
         if ($list_id) {
-            $isDuplicate = (new \App\Controllers\ItemController())->isDuplicate($list_id, $data['url'] ?? $url, $item_id);
+            $duplicateUrl = $data['resolved_url'] ?? ($data['url'] ?? $url);
+            $isDuplicate = (new \App\Controllers\ItemController())->isDuplicate($list_id, $duplicateUrl, $item_id);
         }
 
         echo json_encode(array_merge([

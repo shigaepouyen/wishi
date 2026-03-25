@@ -60,6 +60,58 @@ class UrlUtils {
     }
 
     /**
+     * Nettoie une URL AliExpress pour ne garder que la fiche produit canonique.
+     */
+    public static function cleanAliExpressUrl(string $url): string {
+        if (!str_contains($url, 'aliexpress.') && !str_starts_with($url, 'aliexpress://') && !str_starts_with($url, '//')) {
+            return $url;
+        }
+
+        $normalizedUrl = self::normalizeAliExpressUrl($url);
+        $parsedUrl = parse_url($normalizedUrl);
+        if (!$parsedUrl || !isset($parsedUrl['host'])) {
+            return $url;
+        }
+
+        $productId = self::extractAliExpressProductId($normalizedUrl);
+        $host = str_contains($parsedUrl['host'], 'aliexpress.') ? $parsedUrl['host'] : 'www.aliexpress.com';
+        $scheme = in_array($parsedUrl['scheme'] ?? 'https', ['http', 'https'], true) ? ($parsedUrl['scheme'] ?? 'https') : 'https';
+        if ($productId) {
+            return "{$scheme}://{$host}/item/{$productId}.html";
+        }
+
+        return $scheme . '://' . $host . ($parsedUrl['path'] ?? '');
+    }
+
+    /**
+     * Extrait l'identifiant produit d'une URL AliExpress canonique, raccourcie ou deep-link app.
+     */
+    public static function extractAliExpressProductId(string $url): ?string {
+        $normalizedUrl = self::normalizeAliExpressUrl($url);
+
+        $patterns = [
+            '/\/(?:item|i)\/(\d+)\.(?:html|htm)/i',
+            '/(?:[?&]|^)productId=(\d+)/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalizedUrl, $matches)) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    private static function normalizeAliExpressUrl(string $url): string {
+        if (str_starts_with($url, '//')) {
+            return 'https:' . $url;
+        }
+
+        return $url;
+    }
+
+    /**
      * Extrait un nom de domaine lisible pour affichage
      */
     public static function getDomainLabel(?string $url): string {

@@ -121,7 +121,8 @@ function adminList() {
                     if (data.is_generic) {
                         window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Ce site semble bloquer l\'accès automatique. Remplissage manuel nécessaire.", type: "info" } }));
                     } else {
-                        if (data.url) this.form.url = data.url;
+                        const scrapedUrl = (data.preserve_source_url && data.source_url) ? data.source_url : data.url;
+                        if (scrapedUrl) this.form.url = scrapedUrl;
                         this.form.title = data.title || this.form.title;
                         this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
                         this.form.currency = (data.price && data.price.currency) ? data.price.currency : this.form.currency;
