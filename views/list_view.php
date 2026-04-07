@@ -76,7 +76,7 @@
 
                     <div class="flex gap-4 mb-4">
                         <div class="w-20 h-20 shrink-0 bg-slate-50 rounded-xl overflow-hidden border border-slate-50">
-                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.svg') ?>" class="w-full h-full object-cover">
+                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/wishi-placeholder.png') ?>" class="w-full h-full object-cover">
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 mb-0.5">

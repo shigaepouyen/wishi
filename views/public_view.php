@@ -68,7 +68,7 @@
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between hover:border-<?= $color ?>-200 hover:shadow-md transition-all duration-300 group <?= $item['priority'] == 3 ? "ring-2 ring-amber-400 ring-offset-2" : '' ?> <?= $item['is_taken'] ? 'opacity-60 grayscale-[0.3]' : '' ?>">
                     <div class="flex gap-5 mb-5">
                         <div class="w-24 h-24 shrink-0 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
-                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.svg') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/wishi-placeholder.png') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
                             <div class="flex items-center gap-2 mb-1">
