@@ -61,6 +61,8 @@ class ScraperService {
             Security::assertSafeExternalUrl($url);
 
             $inputUrl = $url;
+            $isEtsyUrl = str_contains($url, 'etsy.');
+            $usedEtsyPreviewFallback = false;
             // Pour AliExpress et Etsy on évite le Referer google qui peut déclencher des erreurs ou redirections
             $headers = [];
             if (!str_contains($url, 'aliexpress.com') && !str_contains($url, 'etsy.com')) {
@@ -71,7 +73,11 @@ class ScraperService {
             // si aucune devise n'est déjà spécifiée.
             // On limite cette pratique aux domaines qui ne semblent pas être des moteurs de recherche
             // ou des URLs complexes pour éviter de casser des signatures.
-            if (!str_contains($url, 'currency=') && !str_contains($url, 'amazon.') && !str_contains($url, 'google.') && !str_contains($url, 'aliexpress.')) {
+            if (!str_contains($url, 'currency=')
+                && !str_contains($url, 'amazon.')
+                && !str_contains($url, 'google.')
+                && !str_contains($url, 'aliexpress.')
+                && !$isEtsyUrl) {
                 $separator = str_contains($url, '?') ? '&' : '?';
                 $url = $url . $separator . 'currency=EUR';
             }
@@ -95,6 +101,16 @@ class ScraperService {
 
             $html = (string)$response->getBody();
 
+            if ($isEtsyUrl && $this->isEtsyBlockedResponse($statusCode, $html)) {
+                $etsyPreviewPage = $this->fetchEtsyPreviewPage($inputUrl);
+                if ($etsyPreviewPage) {
+                    $statusCode = $etsyPreviewPage['status_code'];
+                    $finalUrl = $etsyPreviewPage['final_url'];
+                    $html = $etsyPreviewPage['html'];
+                    $usedEtsyPreviewFallback = true;
+                }
+            }
+
             if ($this->isTigerProtectChallenge($statusCode, $html)) {
                 $solvedPage = $this->solveTigerProtectChallenge($finalUrl, $html);
                 if (!$solvedPage) {
@@ -110,6 +126,7 @@ class ScraperService {
             // Nettoyage de l'URL Amazon
             $url = UrlUtils::cleanAmazonUrl($finalUrl);
             $url = UrlUtils::cleanAliExpressUrl($url);
+            $url = UrlUtils::cleanEtsyUrl($url);
 
             // Extraction OpenGraph précoce (souvent présent même sur les pages de redirection/captcha)
             $ogData = $this->extractOpenGraphData($html);
@@ -147,6 +164,12 @@ class ScraperService {
                 $title = $ogData['title'] ?? '';
                 $description = $ogData['description'] ?? '';
                 $image = $ogData['image'] ?? '';
+            }
+
+            if ($isEtsyUrl && $usedEtsyPreviewFallback) {
+                $title = $ogData['title'] ?? $title;
+                $description = $ogData['description'] ?? $description;
+                $image = $ogData['image'] ?? $image;
             }
 
             // Fallbacks robustes via OpenGraph si Embed a échoué
@@ -253,7 +276,7 @@ class ScraperService {
                 return 0;
             });
 
-            $preserveSourceUrl = (bool)($aliExpressData['preserve_source_url'] ?? false);
+            $preserveSourceUrl = (bool)($aliExpressData['preserve_source_url'] ?? false) || $usedEtsyPreviewFallback;
             $storedUrl = ($preserveSourceUrl && $inputUrl !== '') ? $inputUrl : $url;
 
             return [
@@ -356,13 +379,14 @@ class ScraperService {
             }
         }
 
-        return ['amount' => 0, 'currency' => 'EUR'];
+        return ['amount' => 0, 'currency' => $detectedCurrency ?: 'EUR'];
     }
 
     private function detectCurrency($html) {
         // STRATÉGIE 1 : Chercher dans les balises meta (plus fiable que le contenu global)
         if (($metaCurrency = $this->extractMetaContent($html, 'og:price:currency', ['property'])) !== null) return strtoupper(trim($metaCurrency));
         if (($metaCurrency = $this->extractMetaContent($html, 'currency', ['name'])) !== null) return strtoupper(trim($metaCurrency));
+        if (preg_match('/\bdata-currency\s*=\s*"([^"]+)"/i', $html, $m)) return strtoupper(trim($m[1]));
 
         // STRATÉGIE 2 : Plateformes spécifiques
         if (preg_match('/Shopify\.currency\s*=\s*\{"active":"([^"]+)"/i', $html, $m)) return strtoupper(trim($m[1]));
@@ -388,6 +412,52 @@ class ScraperService {
         if (preg_match('/(?:£|&pound;)\s*\d|\d[\d\s,.]*\s*(?:£|&pound;)/iu', $html)) return 'GBP';
 
         return 'EUR';
+    }
+
+    private function isEtsyBlockedResponse(int $statusCode, string $html): bool {
+        if (!str_contains(strtolower($html), 'etsy')) {
+            return false;
+        }
+
+        return $statusCode === 403
+            || str_contains($html, 'Please enable JS and disable any ad blocker')
+            || str_contains($html, 'captcha-delivery.com')
+            || str_contains($html, 'geo.captcha-delivery.com');
+    }
+
+    private function fetchEtsyPreviewPage(string $url): ?array {
+        try {
+            $response = $this->client->get($url, [
+                'http_errors' => false,
+                'headers' => [
+                    'User-Agent' => 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+                    'Accept-Language' => 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+                ],
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $html = (string)$response->getBody();
+            $finalUrl = $url;
+
+            if ($response->hasHeader('X-GUZZLE-REDIRECT-HISTORY')) {
+                $history = $response->getHeader('X-GUZZLE-REDIRECT-HISTORY');
+                $finalUrl = end($history);
+            }
+
+            if ($statusCode !== 200 || !str_contains($html, 'link preview services')) {
+                return null;
+            }
+
+            Security::assertSafeExternalUrl($finalUrl);
+
+            return [
+                'status_code' => $statusCode,
+                'html' => $html,
+                'final_url' => $finalUrl,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function normalizePriceAmount(string $rawAmount): float {

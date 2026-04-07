@@ -84,6 +84,47 @@ class UrlUtils {
     }
 
     /**
+     * Nettoie une URL Etsy pour ne garder que la fiche produit canonique
+     * et, si présente, la variante sélectionnée.
+     */
+    public static function cleanEtsyUrl(string $url): string {
+        if (!str_contains($url, 'etsy.')) {
+            return $url;
+        }
+
+        $parsedUrl = parse_url($url);
+        if (!$parsedUrl || !isset($parsedUrl['host'])) {
+            return $url;
+        }
+
+        $scheme = in_array($parsedUrl['scheme'] ?? 'https', ['http', 'https'], true) ? ($parsedUrl['scheme'] ?? 'https') : 'https';
+        $host = $parsedUrl['host'];
+        $path = $parsedUrl['path'] ?? '';
+
+        if (!preg_match('#^/(?:[a-z]{2}/)?listing/\d+(?:/[^/?\#]+)?#i', $path, $matches)) {
+            return $scheme . '://' . $host . $path;
+        }
+
+        $cleanPath = $matches[0];
+        $params = [];
+        parse_str($parsedUrl['query'] ?? '', $params);
+
+        $keptParams = [];
+        foreach (['variation0', 'variation1', 'variation_id'] as $key) {
+            if (!empty($params[$key])) {
+                $keptParams[$key] = $params[$key];
+            }
+        }
+
+        $cleanUrl = $scheme . '://' . $host . $cleanPath;
+        if (!empty($keptParams)) {
+            $cleanUrl .= '?' . http_build_query($keptParams);
+        }
+
+        return $cleanUrl;
+    }
+
+    /**
      * Extrait l'identifiant produit d'une URL AliExpress canonique, raccourcie ou deep-link app.
      */
     public static function extractAliExpressProductId(string $url): ?string {
