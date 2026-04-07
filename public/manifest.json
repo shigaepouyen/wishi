@@ -1,5 +1,6 @@
 {
   "name": "Wishi - Listes de Souhaits",
+  "id": "wishi-hub",
   "short_name": "Wishi",
   "description": "L'espace famille pour partager ses vœux.",
   "start_url": "hub.php",

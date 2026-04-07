@@ -1,7 +1,6 @@
-const CACHE_NAME = 'wishi-v1';
+const CACHE_NAME = 'wishi-v2';
 const ASSETS_TO_CACHE = [
   'hub.php',
-  'manifest.json',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js'
 ];
@@ -13,6 +12,7 @@ self.addEventListener('install', (e) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  self.skipWaiting();
 });
 
 // Activation
@@ -28,6 +28,7 @@ self.addEventListener('activate', (e) => {
       );
     })
   );
+  self.clients.claim();
 });
 
 // Gestion des requêtes : Network First, fallback to cache

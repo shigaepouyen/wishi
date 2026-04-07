@@ -55,6 +55,7 @@ $title = "Ajouter un souhait - Wishi";
 $body_class = "bg-$color-50/30";
 $csrf_token = Security::csrfToken();
 $manifest_href = 'manifest.php?profile_id=' . (int)$list['profile_id'];
+$apple_mobile_web_app_title = $list['owner_name'] ?? 'Wishi';
 
 ob_start();
 include __DIR__ . '/../views/add_item_view.php';

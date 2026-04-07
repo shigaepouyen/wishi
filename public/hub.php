@@ -15,6 +15,7 @@ try {
     $hasAdminAccess = AdminAuth::hasAnyAdminAccess();
 
     $title = "Wishi - Le Hub Familial";
+    $apple_mobile_web_app_title = 'Wishi';
     $extra_css = ".profile-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }";
 
     ob_start();
