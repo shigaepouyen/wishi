@@ -64,6 +64,8 @@
     </div>
 
     <script>
+      window.WISHI_CSRF = <?= json_encode($csrf_token ?? '') ?>;
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js')

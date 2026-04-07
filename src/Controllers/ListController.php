@@ -1,6 +1,7 @@
 <?php
 namespace App\Controllers;
 
+use App\Utils\AdminAuth;
 use App\Utils\Database;
 use PDO;
 
@@ -21,6 +22,25 @@ class ListController {
 
         if (!$list) return null;
 
+        return $this->buildAdminListData($db, $list, $category);
+    }
+
+    public function showById(int $id, string $category = '') {
+        $db = \App\Utils\Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT l.*, p.color, p.name as owner_name, p.slug as profile_slug
+            FROM lists l JOIN profiles p ON l.profile_id = p.id
+            WHERE l.id = ?
+        ");
+        $stmt->execute([$id]);
+        $list = $stmt->fetch();
+
+        if (!$list) return null;
+
+        return $this->buildAdminListData($db, $list, $category);
+    }
+
+    private function buildAdminListData(\PDO $db, array $list, string $category): array {
         $itemsQuery = "SELECT * FROM items WHERE list_id = ?";
         $params = [$list['id']];
         if ($category) {
@@ -103,6 +123,8 @@ class ListController {
     }
 
     public function updateSettings() {
+        AdminAuth::start();
+
         $input = json_decode(file_get_contents('php://input'), true);
         $id = $input['id'] ?? null;
         $newName = $input['name'] ?? null;
@@ -110,6 +132,7 @@ class ListController {
         $isSurprise = isset($input['is_surprise']) ? ($input['is_surprise'] ? 1 : 0) : null;
 
         if (!$id || !$newName) return json_encode(['error' => 'Données manquantes']);
+        if ($error = AdminAuth::ensureListAccessJson((int)$id)) return $error;
 
         $db = \App\Utils\Database::getConnection();
         
@@ -137,6 +160,9 @@ class ListController {
     }
 
     public function resetReservations(int $id) {
+        AdminAuth::start();
+        if ($error = AdminAuth::ensureListAccessJson($id)) return $error;
+
         $db = \App\Utils\Database::getConnection();
         $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL WHERE list_id = ?");
         $stmt->execute([$id]);
@@ -144,6 +170,9 @@ class ListController {
     }
 
     public function deleteList(int $id) {
+        AdminAuth::start();
+        if ($error = AdminAuth::ensureListAccessJson($id)) return $error;
+
         $db = \App\Utils\Database::getConnection();
         // On supprime les items puis la liste
         $stmt = $db->prepare("DELETE FROM items WHERE list_id = ?");

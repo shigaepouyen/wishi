@@ -1,19 +1,36 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use App\Utils\AdminAuth;
+use App\Utils\Security;
+
+AdminAuth::start();
+
 $listController = new \App\Controllers\ListController();
 
-// On récupère le slug admin
 $slug = $_GET['slug'] ?? null;
+$listId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $catFilter = $_GET['cat'] ?? ''; 
 
-if (!$slug) {
+if ($slug) {
+    $list = AdminAuth::authorizeListBySlug($slug);
+    if (!$list) {
+        header('Location: hub.php');
+        exit;
+    }
+
+    header('Location: list.php?id=' . (int)$list['id']);
+    exit;
+}
+
+if (!$listId) {
     header('Location: hub.php');
     exit;
 }
 
-// Le controller cherche maintenant par slug
-$data = $listController->show($slug, $catFilter);
+AdminAuth::requireListPage($listId);
+
+$data = $listController->showById($listId, $catFilter);
 
 if (!$data) {
     die("Désolé, cette liste est introuvable.");
@@ -26,6 +43,7 @@ $color = $list['color'] ?? 'indigo';
 $ownerName = $list['owner_name'] ?? 'Utilisateur';
 $profileSlug = $list['profile_slug'] ?? '';
 $currentCat = $data['currentCategory'] ?? '';
+$csrf_token = Security::csrfToken();
 
 $title = "Wishi - " . htmlspecialchars($list['name']) . " (Admin)";
 $body_class = "bg-$color-50/30";
@@ -79,7 +97,7 @@ function adminList() {
                 onEnd: async (evt) => {
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
-                    await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ ids: ids }) });
+                    await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
                 }
             });
         },
@@ -115,7 +133,9 @@ function adminList() {
             if (!this.form.url || !this.form.url.startsWith("http")) return;
             this.loading = true;
             try {
-                const res = await fetch(`api/scrape.php?list_id=${this.listSettings.id}&item_id=${this.form.id}&url=` + encodeURIComponent(this.form.url));
+                const res = await fetch(`api/scrape.php?list_id=${this.listSettings.id}&item_id=${this.form.id}&url=` + encodeURIComponent(this.form.url), {
+                    headers: { "X-CSRF-Token": window.WISHI_CSRF }
+                });
                 const data = await res.json();
                 if (data.success) {
                     if (data.is_generic) {
@@ -153,7 +173,7 @@ function adminList() {
         },
 
         async saveEdit() {
-            const response = await fetch("api/update_item.php", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(this.form) });
+            const response = await fetch("api/update_item.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify(this.form) });
             const result = await response.json();
             if(result.success) {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Modification enregistrée !", type: "success" } }));
@@ -169,7 +189,7 @@ function adminList() {
         },
 
         async executeDelete() {
-            const response = await fetch("api/delete_item.php", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ id: this.itemToDelete }) });
+            const response = await fetch("api/delete_item.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ id: this.itemToDelete }) });
             const result = await response.json();
             if(result.success) {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Souhait supprimé !", type: "success" } }));
@@ -182,7 +202,7 @@ function adminList() {
         async saveSettings() {
             const response = await fetch("api/update_list_settings.php", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
+                headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF},
                 body: JSON.stringify(this.listSettings)
             });
             const result = await response.json();
@@ -194,7 +214,7 @@ function adminList() {
             if(!confirm("Veux-tu vraiment rendre tous les cadeaux de nouveau disponibles ?")) return;
             const response = await fetch("api/reset_list.php", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
+                headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF},
                 body: JSON.stringify({ id: this.listSettings.id })
             });
             const result = await response.json();
@@ -205,11 +225,11 @@ function adminList() {
             if(!confirm("ALERTE : Supprimer définitivement cette liste et tous ses cadeaux ?")) return;
             const response = await fetch("api/delete_list.php", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
+                headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF},
                 body: JSON.stringify({ id: this.listSettings.id })
             });
             const result = await response.json();
-            if(result.success) window.location.href = "universe.php?slug=' . $profileSlug . '";
+            if(result.success) window.location.href = "universe.php?id=' . (int)$list['profile_id'] . '";
         }
     }
 }

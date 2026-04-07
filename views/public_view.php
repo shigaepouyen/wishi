@@ -68,7 +68,7 @@
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between hover:border-<?= $color ?>-200 hover:shadow-md transition-all duration-300 group <?= $item['priority'] == 3 ? "ring-2 ring-amber-400 ring-offset-2" : '' ?> <?= $item['is_taken'] ? 'opacity-60 grayscale-[0.3]' : '' ?>">
                     <div class="flex gap-5 mb-5">
                         <div class="w-24 h-24 shrink-0 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
-                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.png') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/placeholder.svg') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
                             <div class="flex items-center gap-2 mb-1">
@@ -93,21 +93,21 @@
 
                     <div class="flex gap-2 mt-auto">
                         <?php if($item['url']): ?>
-                        <a href="<?= htmlspecialchars($item['url']) ?>" target="_blank" class="flex-1 py-3 bg-slate-50 text-slate-500 rounded-xl font-bold text-xs text-center hover:bg-slate-100 transition-colors">Voir</a>
+                        <a href="<?= htmlspecialchars($item['url']) ?>" target="_blank" rel="noreferrer noopener" class="flex-1 py-3 bg-slate-50 text-slate-500 rounded-xl font-bold text-xs text-center hover:bg-slate-100 transition-colors">Voir</a>
                         <?php endif; ?>
 
                         <?php if($item['is_taken']): ?>
+                            <?php $hasReservationCookie = \App\Utils\Security::hasValidReservationCookie($item['id'], $_COOKIE["reserved_item_" . $item['id']] ?? null); ?>
                             <div class="flex-[2] flex flex-col gap-1">
                                 <span class="bg-slate-50 text-slate-400 py-3 rounded-xl font-bold text-xs text-center italic">Réservé par <?= htmlspecialchars($item['taken_by']) ?></span>
-                                <template x-if="hasCookie(<?= $item['id'] ?>)">
+                                <?php if ($hasReservationCookie): ?>
                                     <button @click="cancelGift(<?= $item['id'] ?>)" class="text-[9px] font-bold text-red-400 hover:text-red-600 uppercase tracking-wider text-center mt-1">Annuler ma réservation</button>
-                                </template>
-                                <template x-if="!hasCookie(<?= $item['id'] ?>) && <?= $item['donor_email'] ? 'true' : 'false' ?>">
-                                    <button @click="openCancelModal(<?= $item['id'] ?>, '<?= addslashes($item['title']) ?>')" class="text-[9px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider text-center mt-1">Annuler avec mon email</button>
-                                </template>
+                                <?php elseif ($item['donor_email']): ?>
+                                    <button @click="openCancelModal(<?= $item['id'] ?>, <?= htmlspecialchars(json_encode($item['title']), ENT_QUOTES, 'UTF-8') ?>)" class="text-[9px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider text-center mt-1">Annuler avec mon email</button>
+                                <?php endif; ?>
                             </div>
                         <?php else: ?>
-                            <button @click="openModal(<?= $item['id'] ?>, '<?= addslashes($item['title']) ?>')"
+                            <button @click="openModal(<?= $item['id'] ?>, <?= htmlspecialchars(json_encode($item['title']), ENT_QUOTES, 'UTF-8') ?>)"
                                     class="flex-[2] py-3 bg-<?= $color ?>-600 text-white rounded-xl font-bold hover:brightness-110 shadow-md shadow-<?= $color ?>-100 transition-all text-xs uppercase tracking-wider">
                                 Offrir
                             </button>

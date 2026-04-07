@@ -2,6 +2,12 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+\App\Utils\AdminAuth::start();
+if ($error = \App\Utils\AdminAuth::ensureValidCsrfJson()) {
+    echo $error;
+    exit;
+}
+
 $input = json_decode(file_get_contents('php://input'), true);
 $id = $input['id'] ?? null;
 

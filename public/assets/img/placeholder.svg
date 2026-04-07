@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Illustration cadeau par défaut</title>
+  <desc id="desc">Carte cadeau stylisée avec ruban sur fond doux.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="box" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+    <linearGradient id="lid" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fecdd3" />
+      <stop offset="100%" stop-color="#fda4af" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#bg)" />
+  <circle cx="108" cy="104" r="36" fill="#ffffff" opacity="0.65" />
+  <circle cx="408" cy="134" r="22" fill="#ffffff" opacity="0.8" />
+  <circle cx="392" cy="390" r="28" fill="#ffffff" opacity="0.55" />
+
+  <rect x="116" y="220" width="280" height="156" rx="32" fill="url(#box)" />
+  <rect x="96" y="180" width="320" height="76" rx="30" fill="url(#lid)" />
+
+  <rect x="238" y="180" width="36" height="196" rx="18" fill="#ffffff" opacity="0.95" />
+  <rect x="96" y="213" width="320" height="28" rx="14" fill="#ffffff" opacity="0.95" />
+
+  <path d="M256 180c-36-10-58-33-58-60 0-24 18-42 42-42 28 0 48 24 53 65 4-41 24-65 52-65 24 0 42 18 42 42 0 27-22 50-58 60"
+        fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="20" />
+</svg>

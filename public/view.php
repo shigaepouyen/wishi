@@ -78,9 +78,6 @@ $extra_js = '
                 const result = await response.json();
                 if(result.success) window.location.reload();
                 else alert(result.error || "Une erreur est survenue");
-            },
-            hasCookie(id) {
-                return document.cookie.split(";").some((item) => item.trim().startsWith("reserved_item_" + id + "="));
             }
         }
     }

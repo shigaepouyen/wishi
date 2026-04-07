@@ -8,9 +8,10 @@ $color = $profile['color'] ?: 'indigo';
     loading: false,
     profileForm: {
         id: <?= $profile['id'] ?>,
-        name: '<?= addslashes($profile['name']) ?>',
-        emoji: '<?= addslashes($profile['emoji']) ?>',
-        color: '<?= $color ?>'
+        name: <?= htmlspecialchars(json_encode($profile['name']), ENT_QUOTES, 'UTF-8') ?>,
+        emoji: <?= htmlspecialchars(json_encode($profile['emoji']), ENT_QUOTES, 'UTF-8') ?>,
+        color: <?= htmlspecialchars(json_encode($color), ENT_QUOTES, 'UTF-8') ?>,
+        pin: ''
     }
 }">
 
@@ -29,7 +30,7 @@ $color = $profile['color'] ?: 'indigo';
 
     <header class="flex items-center gap-6 mb-16">
         <div class="text-7xl drop-shadow-lg select-none">
-            <?= $profile['emoji'] ?: '👤' ?>
+            <?= htmlspecialchars($profile['emoji'] ?: '👤') ?>
         </div>
         <div>
             <h1 class="text-4xl font-black tracking-tight text-slate-900">
@@ -48,7 +49,7 @@ $color = $profile['color'] ?: 'indigo';
             </div>
         <?php else: ?>
             <?php foreach($lists as $l): ?>
-            <a href="list.php?slug=<?= $l['slug_admin'] ?>" class="group bg-white p-6 rounded-2xl flex justify-between items-center shadow-sm border border-slate-100 hover:border-<?= $color ?>-200 hover:shadow-md transition-all">
+            <a href="list.php?id=<?= (int)$l['id'] ?>" class="group bg-white p-6 rounded-2xl flex justify-between items-center shadow-sm border border-slate-100 hover:border-<?= $color ?>-200 hover:shadow-md transition-all">
                 <div class="flex items-center gap-5">
                     <div class="w-12 h-12 bg-<?= $color ?>-50 text-<?= $color ?>-500 rounded-xl flex items-center justify-center text-2xl">
                         🎁
@@ -101,16 +102,44 @@ $color = $profile['color'] ?: 'indigo';
                     </div>
                 </div>
 
+                <div>
+                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Nouveau PIN Admin</label>
+                    <input type="password" x-model="profileForm.pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Laisser vide pour garder l'ancien" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-xl bg-transparent transition-all">
+                    <p class="text-[10px] text-slate-400 mt-2">4 chiffres. PIN par défaut des profils existants : <span class="font-black text-slate-700">0000</span>.</p>
+                </div>
+
+                <div x-data="{ copiedDirect: false, copiedBackup: false, directUrl: window.location.origin + '/universe.php?id=<?= (int)$profile['id'] ?>', backupUrl: window.location.origin + '/universe.php?token=<?= $profile['admin_slug'] ?>' }" class="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-4">
+                    <div>
+                        <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Raccourci iPhone Recommandé</p>
+                        <p class="text-xs text-slate-500 leading-relaxed">Utilise cette URL directe du profil pour que l’icône iPhone ouvre cet univers puis demande le PIN si nécessaire.</p>
+                        <div class="mt-3 flex gap-2">
+                            <div class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] text-slate-500 font-mono truncate" x-text="directUrl"></div>
+                            <button @click="navigator.clipboard.writeText(directUrl); copiedDirect = true; setTimeout(() => copiedDirect = false, 1800)" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all" x-text="copiedDirect ? 'Copié' : 'Copier'"></button>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200/70">
+                        <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Lien Secret De Secours</p>
+                        <p class="text-xs text-slate-500 leading-relaxed">À garder en secours si tu veux rouvrir une session ou recréer un raccourci admin.</p>
+                        <div class="mt-3 flex gap-2">
+                            <div class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] text-slate-500 font-mono truncate" x-text="backupUrl"></div>
+                            <button @click="navigator.clipboard.writeText(backupUrl); copiedBackup = true; setTimeout(() => copiedBackup = false, 1800)" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all" x-text="copiedBackup ? 'Copié' : 'Copier'"></button>
+                        </div>
+                    </div>
+
+                    <p class="text-[10px] text-slate-400">Sur iPhone : ouvre l’URL directe dans Safari puis fais <span class="font-black text-slate-700">Partager &gt; Sur l’écran d’accueil</span>. Cette action ne peut pas être lancée automatiquement par le site.</p>
+                </div>
+
                 <div class="pt-6 space-y-3">
                     <button @click="
                         loading = true;
                         const res = await fetch('api/update_profile.php', {
                             method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
+                            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.WISHI_CSRF},
                             body: JSON.stringify(profileForm)
                         });
                         const data = await res.json();
-                        if(data.success) window.location.href = 'universe.php?slug=' + data.new_slug;
+                        if(data.success) window.location.href = 'universe.php?id=' + profileForm.id;
                         else { alert(data.error); loading = false; }
                     " class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:brightness-110 transition-all">
                         Sauvegarder
@@ -120,7 +149,7 @@ $color = $profile['color'] ?: 'indigo';
                         if(confirm('🚨 Supprimer définitivement cet univers et TOUTES ses listes ?')) {
                             fetch('api/delete_profile.php', {
                                 method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
+                                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.WISHI_CSRF},
                                 body: JSON.stringify({ id: profileForm.id })
                             }).then(() => window.location.href = 'hub.php');
                         }
@@ -146,7 +175,7 @@ $color = $profile['color'] ?: 'indigo';
                     loading = true;
                     const res = await fetch('api/create_list.php', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.WISHI_CSRF},
                         body: JSON.stringify({ name: newListName, profile_id: <?= $profile['id'] ?> })
                     });
                     if((await res.json()).success) window.location.reload();

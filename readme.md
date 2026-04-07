@@ -36,10 +36,12 @@ l'effet de surprise.
 
 -   **URLs propres (slugs) :** aucun ID technique n'est visible. Les
     partages utilisent des slugs lisibles et personnalisés pour chaque profil et chaque liste.
+-   **Connexion admin simple :** chaque profil peut se déverrouiller avec un PIN à 4 chiffres, soit depuis le hub, soit directement depuis l'URL de son univers sur iPhone.
+-   **Lien admin secret de secours :** chaque profil conserve aussi un lien admin personnel qui peut rouvrir une session sécurisée ou servir à recréer un raccourci iPhone.
 -   **Système de réservation :** la famille peut réserver un cadeau en
     indiquant son nom. L'objet est alors marqué comme « pris » pour
     éviter les doublons.
--   **Annulation sécurisée :** une réservation peut être annulée immédiatement via un cookie de session (valable 1h) ou ultérieurement via une vérification par email, permettant de libérer un cadeau sans compte utilisateur.
+-   **Annulation sécurisée :** une réservation peut être annulée immédiatement sur le même appareil pendant 1h, ou plus tard via l'email saisi au moment de la réservation.
 -   **Mode admin vs public :** le propriétaire gère ses envies (ajout, édition, tri) tandis que les proches accèdent à une vue dédiée pour offrir.
 
 ### 📱 Expérience mobile (PWA)
@@ -92,6 +94,34 @@ Puis ouvrez :
 
 ------------------------------------------------------------------------
 
+## 📱 Accès Admin Sur iPhone
+
+Wishi est pensé pour fonctionner confortablement comme web app ajoutée à
+l'écran d'accueil sur iPhone.
+
+### Recommandation
+
+-   Ajoutez à l'écran d'accueil l'**URL directe du profil** du type
+    `universe.php?id=...`.
+-   Au quotidien, l'ado ouvre directement **son univers**.
+-   Si la session n'est pas déjà ouverte, Wishi affiche un écran de
+    déverrouillage dédié à ce profil avec **clavier PIN visuel**.
+-   Une fois la session ouverte, la navigation interne reste propre et
+    fluide sans ressaisie permanente.
+
+### Après une migration ou une purge iOS
+
+-   Si une ancienne icône n'ouvre plus l'admin, ouvrez le profil voulu
+    via `universe.php?id=...` ou passez par `hub.php`.
+-   Si besoin, recréez l'icône avec l'**URL directe du profil**
+    affichée dans l'univers du profil.
+-   Le **lien secret de secours** peut rouvrir une session ou aider à
+    recréer un raccourci si nécessaire.
+-   Les anciennes URLs publiques restent destinées au partage avec les
+    proches, pas à l'administration.
+
+------------------------------------------------------------------------
+
 ## 🛠️ Stack technique
 
 -   **Backend :** PHP 8.1+ (architecture MVC personnalisée)
@@ -106,8 +136,8 @@ Puis ouvrez :
 ## 📁 Structure du projet
 
     public/
-     ├─ hub.php        # Accueil (sélection du profil)
-     ├─ universe.php   # Liste des listes d'un utilisateur
+     ├─ hub.php        # Accueil / accès secondaire par choix de profil
+     ├─ universe.php   # Univers d'un profil + écran de déverrouillage PIN
      ├─ list.php       # Gestion d'une liste (Admin)
      ├─ view.php       # Consultation d'une liste (Public)
      └─ api/           # Endpoints JSON (scrape, add, reserve...)
@@ -139,15 +169,35 @@ Puis ouvrez :
 Pour que le scraping fonctionne correctement, le serveur doit autoriser
 les requêtes HTTP sortantes (utilisé par `api/scrape.php`).
 
+Le scraping refuse désormais les URLs locales, privées ou non sûres
+(`localhost`, IP internes, ports exotiques, etc.) afin de limiter les
+risques SSRF.
+
 ------------------------------------------------------------------------
 
 ## 🔒 Sécurité et Réservations
 
-Wishi a été conçu pour être simple à utiliser sans nécessiter la création de compte pour les donateurs.
+Wishi a été conçu pour rester simple, notamment sur mobile, sans
+imposer de mot de passe aux membres de la famille ni de compte aux
+donateurs.
 
 -   **Données donateurs :** Lorsqu'un proche réserve un cadeau, il peut laisser son nom et optionnellement son email.
--   **Annulation par cookie :** Juste après une réservation, un cookie est posé sur le navigateur, permettant d'annuler le choix pendant **1 heure**.
--   **Annulation par email :** Si le donateur a renseigné son email, il peut demander l'annulation à tout moment via un code de vérification envoyé sur sa boîte (système sécurisé sans mot de passe).
+-   **PIN profil + session :** l'administration peut se faire depuis le
+    hub ou directement depuis l'univers du profil, puis sur une session
+    serveur sécurisée.
+-   **PIN par défaut après migration :** les profils existants reçoivent
+    le PIN initial `0000`, modifiable ensuite dans l'admin de chaque profil.
+-   **Lien admin secret de récupération :** chaque profil garde aussi un
+    lien secret utilisable comme secours ou pour recréer un raccourci iPhone.
+-   **Protection des actions admin :** les écritures admin sont protégées
+    côté serveur par contrôle d'accès et token CSRF.
+-   **Annulation par cookie signé :** juste après une réservation, le
+    même appareil peut l'annuler pendant **1 heure**.
+-   **Annulation par email :** si le donateur a renseigné son email, il
+    peut annuler plus tard depuis la vue publique en ressaisissant cet
+    email.
+-   **Validation des entrées :** les champs sensibles côté profil (couleur,
+    emoji, etc.) sont filtrés côté serveur.
 
 ------------------------------------------------------------------------
 

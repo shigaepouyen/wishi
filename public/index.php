@@ -1,12 +1,31 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// 1. On récupère le slug admin pour savoir dans quelle liste on ajoute
+use App\Utils\AdminAuth;
+use App\Utils\Security;
+
+AdminAuth::start();
+
 $slug = $_GET['slug'] ?? null;
-if (!$slug) {
+$listId = isset($_GET['list']) ? (int)$_GET['list'] : null;
+
+if ($slug) {
+    $authorizedList = AdminAuth::authorizeListBySlug($slug);
+    if (!$authorizedList) {
+        header('Location: hub.php');
+        exit;
+    }
+
+    header('Location: index.php?list=' . (int)$authorizedList['id']);
+    exit;
+}
+
+if (!$listId) {
     header('Location: hub.php');
     exit;
 }
+
+AdminAuth::requireListPage($listId);
 
 $db = \App\Utils\Database::getConnection();
 
@@ -15,9 +34,9 @@ $stmt = $db->prepare("
     SELECT l.*, p.name as owner_name, p.color, p.emoji as owner_emoji
     FROM lists l
     JOIN profiles p ON l.profile_id = p.id
-    WHERE l.slug_admin = ?
+    WHERE l.id = ?
 ");
-$stmt->execute([$slug]);
+$stmt->execute([$listId]);
 $list = $stmt->fetch();
 
 // Sécurité : si la liste n'existe pas, on ne tente pas d'afficher le formulaire
@@ -34,6 +53,7 @@ $existingCategories = $catStmt->fetchAll(PDO::FETCH_COLUMN);
 $color = $list['color'] ?? 'indigo';
 $title = "Ajouter un souhait - Wishi";
 $body_class = "bg-$color-50/30";
+$csrf_token = Security::csrfToken();
 
 ob_start();
 include __DIR__ . '/../views/add_item_view.php';
@@ -86,7 +106,9 @@ function addGiftForm() {
             if (!this.form.url.startsWith("http")) return;
             this.loading = true;
             try {
-                const res = await fetch(`api/scrape.php?list_id=${this.form.list_id}&url=` + encodeURIComponent(this.form.url));
+                const res = await fetch(`api/scrape.php?list_id=${this.form.list_id}&url=` + encodeURIComponent(this.form.url), {
+                    headers: { "X-CSRF-Token": window.WISHI_CSRF }
+                });
                 const data = await res.json();
                 if (data.success) {
                     if (data.is_generic) {
@@ -129,12 +151,12 @@ function addGiftForm() {
             try {
                 const res = await fetch("api/add_item.php", {
                     method: "POST",
-                    headers: {"Content-Type": "application/json"},
+                    headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF},
                     body: JSON.stringify(this.form)
                 });
                 const result = await res.json();
                 if (result.success) {
-                    window.location.href = "list.php?slug=' . $list['slug_admin'] . '";
+                    window.location.href = "list.php?id=' . (int)$list['id'] . '";
                 } else {
                     window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : " + result.error, type: "error" } }));
                 }

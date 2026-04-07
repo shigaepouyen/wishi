@@ -6,9 +6,21 @@ ini_set('display_errors', 0);
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use App\Services\ScraperService;
+use App\Utils\AdminAuth;
 use App\Utils\CurrencyUtils;
+use App\Utils\Security;
 
 header('Content-Type: application/json');
+
+AdminAuth::start();
+if ($error = AdminAuth::ensureAdminJson()) {
+    echo $error;
+    exit;
+}
+if ($error = AdminAuth::ensureValidCsrfJson()) {
+    echo $error;
+    exit;
+}
 
 // On récupère l'URL proprement
 $url = $_GET['url'] ?? null;
@@ -21,6 +33,22 @@ if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
 }
 
 try {
+    Security::assertSafeExternalUrl($url);
+} catch (\InvalidArgumentException $e) {
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    exit;
+}
+
+try {
+    if ($list_id && ($error = AdminAuth::ensureListAccessJson($list_id))) {
+        echo $error;
+        exit;
+    }
+    if ($item_id && ($error = AdminAuth::ensureItemAccessJson($item_id))) {
+        echo $error;
+        exit;
+    }
+
     $scraper = new ScraperService();
     $data = $scraper->getLinkData($url);
 

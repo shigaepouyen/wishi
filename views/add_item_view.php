@@ -1,12 +1,12 @@
 <div class="max-w-5xl mx-auto py-12 px-4" x-data="addGiftForm()">
 
     <div class="flex justify-between items-center mb-10">
-        <a href="list.php?slug=<?= $list['slug_admin'] ?>" class="text-<?= $color ?>-600 font-bold flex items-center gap-2 hover:-translate-x-1 transition-all uppercase text-[10px] tracking-widest">
+        <a href="list.php?id=<?= (int)$list['id'] ?>" class="text-<?= $color ?>-600 font-bold flex items-center gap-2 hover:-translate-x-1 transition-all uppercase text-[10px] tracking-widest">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
             Retour
         </a>
         <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
-            <span class="text-lg"><?= $list['owner_emoji'] ?></span>
+            <span class="text-lg"><?= htmlspecialchars($list['owner_emoji']) ?></span>
             <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pour <span class="text-<?= $color ?>-600"><?= htmlspecialchars($list['owner_name']) ?></span></span>
         </div>
     </div>

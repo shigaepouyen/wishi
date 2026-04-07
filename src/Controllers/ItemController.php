@@ -1,9 +1,11 @@
 <?php
 namespace App\Controllers;
 
+use App\Utils\AdminAuth;
 use App\Utils\Database;
-use App\Utils\UrlUtils;
 use App\Utils\CurrencyUtils;
+use App\Utils\Security;
+use App\Utils\UrlUtils;
 use PDO;
 
 class ItemController {
@@ -51,11 +53,14 @@ class ItemController {
     }
 
     public function save() {
+        AdminAuth::start();
+
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!$input || !isset($input['title']) || !isset($input['list_id'])) {
             return json_encode(['error' => 'Données invalides']);
         }
+        if ($error = AdminAuth::ensureListAccessJson((int)$input['list_id'])) return $error;
 
         $url = $input['url'] ?? '';
         if (!empty($url) && $this->isDuplicate((int)$input['list_id'], $url)) {
@@ -85,7 +90,7 @@ class ItemController {
                 $input['title'],
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
-                UrlUtils::cleanAmazonUrl($input['url'] ?? ''),
+                $this->normalizeComparableUrl($input['url'] ?? ''),
                 $price,
                 $currency,
                 $priceEur,
@@ -106,8 +111,8 @@ class ItemController {
         $input = json_decode(file_get_contents('php://input'), true);
         
         $itemId = isset($input['item_id']) ? (int)$input['item_id'] : null;
-        $name = isset($input['name']) ? htmlspecialchars($input['name']) : 'Anonyme';
-        $email = isset($input['email']) ? htmlspecialchars($input['email']) : null;
+        $name = Security::sanitizeName($input['name'] ?? null, 80, 'Anonyme');
+        $email = Security::sanitizeOptionalEmail($input['email'] ?? null);
 
         if (!$itemId) {
             return json_encode(['error' => 'ID de l\'article manquant']);
@@ -115,11 +120,21 @@ class ItemController {
 
         try {
             $db = \App\Utils\Database::getConnection();
-            $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by = ?, donor_email = ? WHERE id = ?");
+            $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by = ?, donor_email = ? WHERE id = ? AND is_taken = 0");
             $stmt->execute([$name, $email, $itemId]);
 
+            if ($stmt->rowCount() === 0) {
+                return json_encode(['error' => 'Ce cadeau est déjà réservé.']);
+            }
+
             // Définir un cookie de session pour permettre l'annulation immédiate
-            setcookie("reserved_item_" . $itemId, "1", time() + 3600, "/");
+            setcookie("reserved_item_" . $itemId, Security::makeReservationCookieValue($itemId), [
+                'expires' => time() + 3600,
+                'path' => '/',
+                'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
 
             return json_encode(['success' => true]);
         } catch (\PDOException $e) {
@@ -151,7 +166,7 @@ class ItemController {
             $canCancel = false;
 
             // 1. Vérification par cookie (annulation immédiate sur le même navigateur)
-            if (isset($_COOKIE["reserved_item_" . $itemId])) {
+            if (Security::hasValidReservationCookie($itemId, $_COOKIE["reserved_item_" . $itemId] ?? null)) {
                 $canCancel = true;
             }
 
@@ -178,10 +193,13 @@ class ItemController {
     }
 
     public function update() {
+        AdminAuth::start();
+
         $input = json_decode(file_get_contents('php://input'), true);
         $id = $input['id'] ?? null;
 
         if (!$id) return json_encode(['error' => 'ID manquant']);
+        if ($error = AdminAuth::ensureItemAccessJson((int)$id)) return $error;
 
         $url = $input['url'] ?? '';
 
@@ -218,7 +236,7 @@ class ItemController {
                 $category,
                 $input['description'] ?? '',
                 $input['image_url'] ?? '',
-                UrlUtils::cleanAmazonUrl($input['url'] ?? ''),
+                $this->normalizeComparableUrl($input['url'] ?? ''),
                 $id
             ]);
 
@@ -229,10 +247,13 @@ class ItemController {
     }
 
     public function delete() {
+        AdminAuth::start();
+
         $input = json_decode(file_get_contents('php://input'), true);
         $id = $input['id'] ?? null;
 
         if (!$id) return json_encode(['error' => 'ID manquant']);
+        if ($error = AdminAuth::ensureItemAccessJson((int)$id)) return $error;
 
         try {
             $db = \App\Utils\Database::getConnection();
@@ -245,6 +266,8 @@ class ItemController {
     }
 
     public function reorder() {
+        AdminAuth::start();
+
         $input = json_decode(file_get_contents('php://input'), true);
         $ids = $input['ids'] ?? []; // Tableau d'IDs dans le nouvel ordre
 
@@ -252,6 +275,23 @@ class ItemController {
 
         try {
             $db = \App\Utils\Database::getConnection();
+            $ids = array_values(array_filter(array_map('intval', $ids)));
+            if (empty($ids)) {
+                return json_encode(['error' => 'Aucun ID valide reçu']);
+            }
+
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $listStmt = $db->prepare("SELECT DISTINCT list_id FROM items WHERE id IN ($placeholders)");
+            $listStmt->execute($ids);
+            $listIds = array_map('intval', $listStmt->fetchAll(PDO::FETCH_COLUMN));
+
+            if (count($listIds) !== 1) {
+                return json_encode(['error' => 'Réorganisation invalide.']);
+            }
+            if ($error = AdminAuth::ensureListAccessJson($listIds[0])) {
+                return $error;
+            }
+
             $db->beginTransaction();
 
             $stmt = $db->prepare("UPDATE items SET position = ? WHERE id = ?");

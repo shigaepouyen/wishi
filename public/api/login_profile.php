@@ -8,9 +8,5 @@ if ($error = \App\Utils\AdminAuth::ensureValidCsrfJson()) {
     exit;
 }
 
-try {
-    $controller = new \App\Controllers\ListController();
-    echo $controller->updateSettings();
-} catch (\Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-}
+$controller = new \App\Controllers\ProfileController();
+echo $controller->loginWithPin();

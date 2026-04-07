@@ -1,10 +1,18 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use App\Utils\AdminAuth;
+use App\Utils\Security;
+
+AdminAuth::start();
+
 $controller = new \App\Controllers\ProfileController();
 try {
+    $authorizedProfileIds = AdminAuth::getAuthorizedProfileIds();
     $data = $controller->hub();
     $profiles = $data['profiles'];
+    $csrf_token = Security::csrfToken();
+    $hasAdminAccess = AdminAuth::hasAnyAdminAccess();
 
     $title = "Wishi - Le Hub Familial";
     $extra_css = ".profile-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }";

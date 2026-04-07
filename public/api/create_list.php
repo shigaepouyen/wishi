@@ -2,8 +2,14 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+\App\Utils\AdminAuth::start();
+if ($error = \App\Utils\AdminAuth::ensureValidCsrfJson()) {
+    echo $error;
+    exit;
+}
+
 $input = json_decode(file_get_contents('php://input'), true);
-$name = $input['name'] ?? null;
+$name = \App\Utils\Security::sanitizeName($input['name'] ?? null, 120);
 $profile_id = $input['profile_id'] ?? null;
 
 function slugify($text) {
@@ -14,6 +20,10 @@ function slugify($text) {
 
 try {
     $db = \App\Utils\Database::getConnection();
+    if ($error = \App\Utils\AdminAuth::ensureProfileAccessJson((int)$profile_id)) {
+        echo $error;
+        exit;
+    }
 
     // 1. On récupère le prénom du profil pour l'inclure dans le slug
     $stmtP = $db->prepare("SELECT name FROM profiles WHERE id = ?");
@@ -35,6 +45,8 @@ try {
 
     $stmt = $db->prepare("INSERT INTO lists (profile_id, name, slug_admin, slug_public, is_surprise) VALUES (?, ?, ?, ?, 1)");
     $stmt->execute([$profile_id, $name, $slug_admin, $slug_public]);
+
+    \App\Utils\AdminAuth::grantListAccess((int)$db->lastInsertId(), (int)$profile_id);
 
     echo json_encode(['success' => true]);
 } catch (Exception $e) {

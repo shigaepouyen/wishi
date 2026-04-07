@@ -66,6 +66,38 @@ class Database {
                 if (!$hasIsSurprise) {
                     self::$instance->exec("ALTER TABLE lists ADD COLUMN is_surprise INTEGER DEFAULT 1;");
                 }
+
+                // Migration : assure l'existence de la colonne 'admin_slug' dans 'profiles'
+                $profileColumns = self::$instance->query("PRAGMA table_info(profiles)")->fetchAll();
+                $hasProfileAdminSlug = false;
+                foreach ($profileColumns as $col) {
+                    if ($col['name'] === 'admin_slug') $hasProfileAdminSlug = true;
+                }
+                if (!$hasProfileAdminSlug) {
+                    self::$instance->exec("ALTER TABLE profiles ADD COLUMN admin_slug TEXT;");
+                }
+
+                $hasProfilePinHash = false;
+                foreach ($profileColumns as $col) {
+                    if ($col['name'] === 'admin_pin_hash') $hasProfilePinHash = true;
+                }
+                if (!$hasProfilePinHash) {
+                    self::$instance->exec("ALTER TABLE profiles ADD COLUMN admin_pin_hash TEXT;");
+                }
+
+                $profilesWithoutAdminSlug = self::$instance->query("SELECT id FROM profiles WHERE admin_slug IS NULL OR admin_slug = ''")->fetchAll();
+                $profileAdminStmt = self::$instance->prepare("UPDATE profiles SET admin_slug = ? WHERE id = ?");
+                foreach ($profilesWithoutAdminSlug as $profile) {
+                    $profileAdminStmt->execute([bin2hex(random_bytes(16)), $profile['id']]);
+                }
+
+                $profilesWithoutPin = self::$instance->query("SELECT id FROM profiles WHERE admin_pin_hash IS NULL OR admin_pin_hash = ''")->fetchAll();
+                $profilePinStmt = self::$instance->prepare("UPDATE profiles SET admin_pin_hash = ? WHERE id = ?");
+                foreach ($profilesWithoutPin as $profile) {
+                    $profilePinStmt->execute([Security::hashAdminPin(Security::defaultAdminPin()), $profile['id']]);
+                }
+
+                self::$instance->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_admin_slug ON profiles(admin_slug);");
             } catch (\Exception $e) {}
         }
         return self::$instance;
@@ -79,6 +111,8 @@ class Database {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             slug TEXT UNIQUE NOT NULL,
+            admin_slug TEXT UNIQUE NOT NULL,
+            admin_pin_hash TEXT NOT NULL,
             emoji TEXT,
             color TEXT DEFAULT 'indigo'
         )");

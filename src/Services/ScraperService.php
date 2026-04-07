@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Utils\Security;
 use App\Utils\UrlUtils;
 use Embed\Embed;
 use GuzzleHttp\Client;
@@ -57,6 +58,8 @@ class ScraperService {
 
     public function getLinkData(string $url) {
         try {
+            Security::assertSafeExternalUrl($url);
+
             $inputUrl = $url;
             // Pour AliExpress et Etsy on évite le Referer google qui peut déclencher des erreurs ou redirections
             $headers = [];
@@ -88,6 +91,7 @@ class ScraperService {
                 $history = $response->getHeader('X-GUZZLE-REDIRECT-HISTORY');
                 $finalUrl = end($history);
             }
+            Security::assertSafeExternalUrl($finalUrl);
 
             $html = (string)$response->getBody();
 
