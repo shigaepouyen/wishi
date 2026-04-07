@@ -46,7 +46,6 @@ $lists = $data['lists'];
 $color = $profile['color'] ?: 'indigo';
 $csrf_token = Security::csrfToken();
 $manifest_href = 'manifest.php?profile_id=' . (int)$profile['id'];
-$apple_mobile_web_app_title = $profile['name'];
 
 if (!AdminAuth::canAccessProfileId((int)$profile['id'])) {
     $title = "Déverrouiller " . htmlspecialchars($profile['name']) . " - Wishi";

@@ -18,7 +18,7 @@ $manifestId = ($basePath !== '' ? $basePath : '') . '/app';
 $icon192 = ($basePath !== '' ? $basePath : '') . '/assets/img/icon-192.png';
 $icon512 = ($basePath !== '' ? $basePath : '') . '/assets/img/icon-512.png';
 
-$name = 'Wishi - Listes de Souhaits';
+$name = 'Wishi';
 $shortName = 'Wishi';
 $description = "L'espace famille pour partager ses vœux.";
 $startUrl = $hubUrl;
@@ -41,8 +41,6 @@ if ($profileId > 0) {
 
     if ($profile) {
         $profileName = trim((string)$profile['name']);
-        $name = 'Wishi - ' . $profileName;
-        $shortName = $profileName !== '' ? $profileName : 'Wishi';
         $description = "L'univers Wishi de " . $profileName . '.';
         $startUrl = ($basePath !== '' ? $basePath : '') . '/universe.php?id=' . $profileId;
         $themeColor = $colorMap[$profile['color'] ?? 'indigo'] ?? '#4f46e5';

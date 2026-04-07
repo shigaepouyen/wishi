@@ -75,8 +75,9 @@ $color = $profile['color'] ?: 'indigo';
     </div>
 
     <!-- Admin Modal -->
-    <div x-show="adminModal" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" x-transition>
-        <div class="bg-white rounded-3xl p-10 max-w-md w-full shadow-2xl relative border border-slate-100" @click.away="adminModal = false">
+    <div x-show="adminModal" x-cloak class="fixed inset-0 z-[60] overflow-y-auto p-4 bg-slate-900/40 backdrop-blur-sm" x-transition>
+        <div class="min-h-full flex items-center justify-center py-6">
+        <div class="bg-white rounded-3xl p-6 md:p-10 max-w-md w-full max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl relative border border-slate-100" @click.away="adminModal = false">
             <h2 class="text-2xl font-bold text-slate-900 mb-8">Réglages Profil</h2>
 
             <div class="space-y-6">
@@ -108,28 +109,6 @@ $color = $profile['color'] ?: 'indigo';
                     <p class="text-[10px] text-slate-400 mt-2">4 chiffres. PIN par défaut des profils existants : <span class="font-black text-slate-700">0000</span>.</p>
                 </div>
 
-                <div x-data="{ copiedDirect: false, copiedBackup: false, directUrl: window.location.origin + '/universe.php?id=<?= (int)$profile['id'] ?>', backupUrl: window.location.origin + '/universe.php?token=<?= $profile['admin_slug'] ?>' }" class="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-4">
-                    <div>
-                        <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Raccourci iPhone Recommandé</p>
-                        <p class="text-xs text-slate-500 leading-relaxed">Utilise cette URL directe du profil pour que l’icône iPhone ouvre cet univers puis demande le PIN si nécessaire.</p>
-                        <div class="mt-3 flex gap-2">
-                            <div class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] text-slate-500 font-mono truncate" x-text="directUrl"></div>
-                            <button @click="navigator.clipboard.writeText(directUrl); copiedDirect = true; setTimeout(() => copiedDirect = false, 1800)" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all" x-text="copiedDirect ? 'Copié' : 'Copier'"></button>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 border-t border-slate-200/70">
-                        <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Lien Secret De Secours</p>
-                        <p class="text-xs text-slate-500 leading-relaxed">À garder en secours si tu veux rouvrir une session ou recréer un raccourci admin.</p>
-                        <div class="mt-3 flex gap-2">
-                            <div class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] text-slate-500 font-mono truncate" x-text="backupUrl"></div>
-                            <button @click="navigator.clipboard.writeText(backupUrl); copiedBackup = true; setTimeout(() => copiedBackup = false, 1800)" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all" x-text="copiedBackup ? 'Copié' : 'Copier'"></button>
-                        </div>
-                    </div>
-
-                    <p class="text-[10px] text-slate-400">Sur iPhone : ouvre l’URL directe dans Safari puis fais <span class="font-black text-slate-700">Partager &gt; Sur l’écran d’accueil</span>. Cette action ne peut pas être lancée automatiquement par le site.</p>
-                </div>
-
                 <div class="pt-6 space-y-3">
                     <button @click="
                         loading = true;
@@ -159,11 +138,13 @@ $color = $profile['color'] ?: 'indigo';
                 </div>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- Create List Modal -->
-    <div x-show="createModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" x-transition.opacity>
-        <div class="bg-white rounded-3xl p-10 max-w-md w-full shadow-2xl border border-slate-100 relative" @click.away="createModal = false">
+    <div x-show="createModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-900/40 backdrop-blur-sm" x-transition.opacity>
+        <div class="min-h-full flex items-center justify-center py-6">
+        <div class="bg-white rounded-3xl p-6 md:p-10 max-w-md w-full max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl border border-slate-100 relative" @click.away="createModal = false">
             <h2 class="text-2xl font-bold text-slate-900 mb-8">Nouvelle Liste</h2>
             <div class="space-y-6">
                 <div>
@@ -184,6 +165,7 @@ $color = $profile['color'] ?: 'indigo';
                     Créer la liste
                 </button>
             </div>
+        </div>
         </div>
     </div>
 </div>

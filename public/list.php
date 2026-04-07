@@ -45,7 +45,6 @@ $profileSlug = $list['profile_slug'] ?? '';
 $currentCat = $data['currentCategory'] ?? '';
 $csrf_token = Security::csrfToken();
 $manifest_href = 'manifest.php?profile_id=' . (int)$list['profile_id'];
-$apple_mobile_web_app_title = $ownerName;
 
 $title = "Wishi - " . htmlspecialchars($list['name']) . " (Admin)";
 $body_class = "bg-$color-50/30";

@@ -34,8 +34,8 @@
         </div>
 
         <div class="mt-8 rounded-2xl bg-slate-50 border border-slate-100 p-4">
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Secours</p>
-            <p class="text-xs text-slate-500 leading-relaxed">Si le PIN ne marche pas, ouvre le lien de secours du profil dans Safari ou demande une réinitialisation.</p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Aide</p>
+            <p class="text-xs text-slate-500 leading-relaxed">Si le PIN ne marche pas, demande une réinitialisation depuis l’admin du profil ou à la personne qui gère le site.</p>
         </div>
     </div>
 </div>
