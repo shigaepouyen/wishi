@@ -54,6 +54,7 @@ $color = $list['color'] ?? 'indigo';
 $title = "Ajouter un souhait - Wishi";
 $body_class = "bg-$color-50/30";
 $csrf_token = Security::csrfToken();
+$manifest_href = 'manifest.php?profile_id=' . (int)$list['profile_id'];
 
 ob_start();
 include __DIR__ . '/../views/add_item_view.php';

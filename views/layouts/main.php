@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="<?= htmlspecialchars($manifest_href ?? 'manifest.json') ?>">
 
     <!-- iOS support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
