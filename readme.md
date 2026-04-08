@@ -24,8 +24,8 @@ l'effet de surprise.
 -   **Listes illimitées :** créez des listes par événement (Noël 2026,
     anniversaire, etc.).
 -   **Scraping magique :** collez un lien (Amazon, Fnac, AliExpress...) et Wishi
-    récupère automatiquement le titre, le prix (avec conversion de devise), la photo haute résolution et la
-    description.
+    récupère automatiquement le titre, le prix (avec conversion de devise) et la photo haute résolution.
+    La description reste désormais saisie manuellement par l'utilisateur.
 -   **Organisation intelligente :** classez vos idées par catégories avec suggestions automatiques basées sur vos anciens ajouts.
 -   **Drag and drop :** réorganisez les souhaits par simple
     glisser-déposer grâce à SortableJS.

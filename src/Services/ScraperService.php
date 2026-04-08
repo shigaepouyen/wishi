@@ -158,36 +158,32 @@ class ScraperService {
                 $info = $embed->getExtractorFactory()->createExtractor($uri, $request, $response, $embed->getCrawler());
 
                 $title = $info->title;
-                $description = $info->description;
+                $description = '';
                 $image = (string)$info->image;
             } catch (\Exception $e) {
                 $title = $ogData['title'] ?? '';
-                $description = $ogData['description'] ?? '';
+                $description = '';
                 $image = $ogData['image'] ?? '';
             }
 
             if ($isEtsyUrl && $usedEtsyPreviewFallback) {
                 $title = $ogData['title'] ?? $title;
-                $description = $ogData['description'] ?? $description;
                 $image = $ogData['image'] ?? $image;
             }
 
             // Fallbacks robustes via OpenGraph si Embed a échoué
             $title = $title ?: ($ogData['title'] ?? '');
-            $description = $description ?: ($ogData['description'] ?? '');
             $image = $image ?: ($ogData['image'] ?? '');
 
             // Extraction structurée via JSON-LD (très fiable sur Decathlon, Apple, AliExpress, etc.)
             $ldData = $this->extractJsonLdData($html, $url);
             $title = $ldData['title'] ?: $title;
-            $description = $ldData['description'] ?: $description;
             $image = $ldData['image'] ?: $image;
 
             $aliExpressData = [];
             if (str_contains($url, 'aliexpress.')) {
                 $aliExpressData = $this->extractAliExpressData($html, $finalUrl, $inputUrl);
                 $title = ($aliExpressData['title'] ?? '') ?: $title;
-                $description = ($aliExpressData['description'] ?? '') ?: $description;
                 $image = ($aliExpressData['image'] ?? '') ?: $image;
                 $url = $aliExpressData['resolved_url'] ?? $url;
             }
@@ -196,22 +192,8 @@ class ScraperService {
             if (!$title && preg_match('/<title>(.*?)<\/title>/is', $html, $matches)) {
                 $title = html_entity_decode(trim($matches[1]));
             }
-            if (!$description) {
-                $description = $this->extractMetaContent($html, 'description', ['name']) ?? '';
-            }
-            // Fallback pour Pop Mart et autres structures SPA sans meta description utile
-            if ((!$description || strlen($description) < 50) && preg_match('/<pre[^>]*class="[^"]*Desc[^"]*"[^>]*>(.*?)<\/pre>/is', $html, $matches)) {
-                $description = html_entity_decode(trim($matches[1]));
-            }
-            if (!$description) {
-                $description = $this->extractMetaContent($html, 'og:description', ['property']) ?? '';
-            }
             if (!$image) {
                 $image = $this->extractMetaContent($html, 'og:image', ['property']) ?? '';
-            }
-
-            if (str_contains($url, 'aliexpress.') && $this->isGenericAliExpressDescription($description)) {
-                $description = $aliExpressData['description'] ?? '';
             }
 
             // Nettoyage final
@@ -219,7 +201,7 @@ class ScraperService {
                 $title = $this->cleanAliExpressTitle($title);
             }
             $title = trim(str_replace(["\n", "\r"], ' ', $title));
-            $description = mb_strimwidth(strip_tags(html_entity_decode($description)), 0, 2000, "...");
+            $description = '';
 
             // Extraction avancée du prix
             $priceData = $this->extractPrice($html);
@@ -531,17 +513,13 @@ class ScraperService {
         ))));
 
         $title = $this->extractAliExpressTitleFromApi($productData) ?: ($fallbackData['title'] ?? '');
-        $description = $this->extractAliExpressDescription(
-            $this->getAliExpressComponent($productData, ['DESC', 'descComponent', 'descriptionComponent']),
-            $url
-        );
         $price = $this->extractAliExpressPriceData(
             $this->getAliExpressComponent($productData, ['PRICE', 'priceComponent', 'price'])
         );
 
         return [
             'title' => $title,
-            'description' => $description ?: ($fallbackData['description'] ?? ''),
+            'description' => '',
             'image' => $images[0] ?? ($fallbackData['image'] ?? ''),
             'images' => $images,
             'resolved_url' => $resolvedUrl,
@@ -605,14 +583,9 @@ class ScraperService {
             array_unshift($images, $primaryImage);
         }
 
-        $description = $ogData['description'] ?? '';
-        if ($this->isGenericAliExpressDescription($description)) {
-            $description = '';
-        }
-
         return [
             'title' => $this->cleanAliExpressTitle($ogData['title'] ?? ''),
-            'description' => $description,
+            'description' => '',
             'image' => $images[0] ?? '',
             'images' => array_values(array_unique(array_filter($images))),
             'price' => ['amount' => 0, 'currency' => $this->detectCurrency($html)],
@@ -1080,55 +1053,6 @@ class ScraperService {
         return ['amount' => 0, 'currency' => $currency];
     }
 
-    private function extractAliExpressDescription($descComponent, string $url): string {
-        $descriptionUrl = null;
-        if (is_array($descComponent)) {
-            $descriptionUrl = $descComponent['nativeDescUrl'] ?? $descComponent['pcDescUrl'] ?? $descComponent['descriptionUrl'] ?? $descComponent['descUrl'] ?? null;
-        } elseif (is_string($descComponent) && $descComponent !== '') {
-            $descriptionUrl = $descComponent;
-        }
-
-        if (!is_string($descriptionUrl) || $descriptionUrl === '') {
-            return '';
-        }
-
-        $response = $this->aliExpressClient->get($descriptionUrl, [
-            'http_errors' => false,
-            'headers' => [
-                'Accept' => 'application/json,text/plain,*/*',
-                'Referer' => $url,
-            ],
-        ]);
-
-        if ($response->getStatusCode() >= 400) {
-            return '';
-        }
-
-        $payload = json_decode((string)$response->getBody(), true);
-        if (!is_array($payload) || !isset($payload['moduleList']) || !is_array($payload['moduleList'])) {
-            return '';
-        }
-
-        $parts = [];
-        foreach ($payload['moduleList'] as $module) {
-            if (($module['type'] ?? null) !== 'text') {
-                continue;
-            }
-
-            $content = trim(strip_tags(html_entity_decode((string)($module['data']['content'] ?? ''))));
-            if ($content === '' || preg_match('/^(NOTE|Détails du produit)$/iu', $content)) {
-                continue;
-            }
-
-            $parts[] = $content;
-            if (count($parts) >= 8) {
-                break;
-            }
-        }
-
-        return implode(' ', $parts);
-    }
-
     private function extractAliExpressImagesFromApi(array $productData): array {
         $images = [];
         $imageComponents = array_filter([
@@ -1199,10 +1123,6 @@ class ScraperService {
 
     private function cleanAliExpressTitle(string $title): string {
         return trim((string)preg_replace('/\s*-\s*AliExpress(?:\s+\d+)?$/i', '', $title));
-    }
-
-    private function isGenericAliExpressDescription(string $description): bool {
-        return preg_match('/^Smarter Shopping,\s*Better Living!\s*Aliexpress\.com$/i', trim($description)) === 1;
     }
 
     private function extractAmazonImages($html) {
