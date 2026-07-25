@@ -85,6 +85,42 @@ class ProfileController {
         ];
     }
 
+    /**
+     * Hub public : profil + uniquement ses listes marquées hub_visible=1.
+     * Retourne null si profil introuvable OU si aucune liste visible,
+     * pour ne jamais laisser deviner l'existence d'un slug par la réponse.
+     */
+    public function publicHub(string $slug): ?array {
+        $db = Database::getConnection();
+
+        $stmt = $db->prepare("SELECT id, name, slug, emoji, color FROM profiles WHERE slug = ?");
+        $stmt->execute([$slug]);
+        $profile = $stmt->fetch();
+
+        if (!$profile) {
+            return null;
+        }
+
+        $stmtLists = $db->prepare("
+            SELECT l.id, l.name, l.slug_public,
+            (SELECT COUNT(*) FROM items WHERE list_id = l.id) as count
+            FROM lists l
+            WHERE l.profile_id = ? AND l.hub_visible = 1
+            ORDER BY l.created_at DESC
+        ");
+        $stmtLists->execute([$profile['id']]);
+        $lists = $stmtLists->fetchAll();
+
+        if (empty($lists)) {
+            return null;
+        }
+
+        return [
+            'profile' => $profile,
+            'lists' => $lists
+        ];
+    }
+
     private function slugify($text) {
         $text = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $text);
         $text = preg_replace('/[^a-z0-9]+/', '-', $text);
