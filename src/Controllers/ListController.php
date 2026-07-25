@@ -130,6 +130,7 @@ class ListController {
         $newName = $input['name'] ?? null;
         $regenSlug = $input['regen_slug'] ?? false;
         $isSurprise = isset($input['is_surprise']) ? ($input['is_surprise'] ? 1 : 0) : null;
+        $hubVisible = isset($input['hub_visible']) ? ($input['hub_visible'] ? 1 : 0) : null;
 
         if (!$id || !$newName) return json_encode(['error' => 'Données manquantes']);
         if ($error = AdminAuth::ensureListAccessJson((int)$id)) return $error;
@@ -148,6 +149,11 @@ class ListController {
         if ($isSurprise !== null) {
             $sql .= ", is_surprise = ?";
             $params[] = $isSurprise;
+        }
+
+        if ($hubVisible !== null) {
+            $sql .= ", hub_visible = ?";
+            $params[] = $hubVisible;
         }
 
         $sql .= " WHERE id = ?";
