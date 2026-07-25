@@ -72,7 +72,8 @@ function adminList() {
         listSettings: ' . json_encode([
             'id' => $list['id'],
             'name' => $list['name'],
-            'is_surprise' => $list['is_surprise'] == 1
+            'is_surprise' => $list['is_surprise'] == 1,
+            'hub_visible' => $list['hub_visible'] == 1
         ]) . ',
 
         async init() {

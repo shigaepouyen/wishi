@@ -270,6 +270,18 @@
                     </div>
                 </div>
 
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
+                    <div>
+                        <label class="text-sm font-bold text-slate-800">Visible dans le hub public 🏠</label>
+                        <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest leading-tight">Apparaît dans l'univers public du profil. Sinon, uniquement accessible par le lien direct.</p>
+                    </div>
+                    <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" x-model="listSettings.hub_visible"
+                               class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 z-10"/>
+                        <label class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+
                 <style>
                     .toggle-checkbox:checked { right: 0; border-color: #1e293b; }
                     .toggle-checkbox:checked + .toggle-label { background-color: #1e293b; }

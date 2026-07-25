@@ -8,7 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    <?php if (empty($is_public_surface)): ?>
     <link rel="manifest" href="<?= htmlspecialchars($manifest_href ?? 'manifest.json') ?>">
+    <?php endif; ?>
 
     <!-- iOS support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -66,6 +68,7 @@
     <script>
       window.WISHI_CSRF = <?= json_encode($csrf_token ?? '') ?>;
 
+      <?php if (empty($is_public_surface)): ?>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js')
@@ -73,6 +76,7 @@
             .catch(err => console.log('PWA Error', err));
         });
       }
+      <?php endif; ?>
     </script>
     <?= $extra_js ?? '' ?>
 </body>

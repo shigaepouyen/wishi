@@ -67,6 +67,17 @@ class Database {
                     self::$instance->exec("ALTER TABLE lists ADD COLUMN is_surprise INTEGER DEFAULT 1;");
                 }
 
+                // Migration : assure l'existence de la colonne 'hub_visible' dans 'lists'
+                // (on relit le schéma pour ne pas travailler sur un snapshot périmé par l'ALTER TABLE ci-dessus)
+                $listColumns = self::$instance->query("PRAGMA table_info(lists)")->fetchAll();
+                $hasHubVisible = false;
+                foreach ($listColumns as $col) {
+                    if ($col['name'] === 'hub_visible') $hasHubVisible = true;
+                }
+                if (!$hasHubVisible) {
+                    self::$instance->exec("ALTER TABLE lists ADD COLUMN hub_visible INTEGER DEFAULT 0;");
+                }
+
                 // Migration : assure l'existence de la colonne 'admin_slug' dans 'profiles'
                 $profileColumns = self::$instance->query("PRAGMA table_info(profiles)")->fetchAll();
                 $hasProfileAdminSlug = false;
@@ -98,7 +109,25 @@ class Database {
                 }
 
                 self::$instance->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_admin_slug ON profiles(admin_slug);");
-            } catch (\Exception $e) {}
+
+                // Migration : assure l'existence de la table 'profile_slug_history'
+                self::$instance->exec("CREATE TABLE IF NOT EXISTS profile_slug_history (
+                    slug TEXT PRIMARY KEY,
+                    profile_id INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+
+                // Backfill : chaque slug actuel de profil doit être dans l'historique
+                $historyBackfillStmt = self::$instance->prepare(
+                    "INSERT OR IGNORE INTO profile_slug_history (slug, profile_id) VALUES (?, ?)"
+                );
+                $existingProfiles = self::$instance->query("SELECT id, slug FROM profiles")->fetchAll();
+                foreach ($existingProfiles as $existingProfile) {
+                    $historyBackfillStmt->execute([$existingProfile['slug'], $existingProfile['id']]);
+                }
+            } catch (\Exception $e) {
+                error_log('Wishi migration automatique échouée : ' . $e->getMessage());
+            }
         }
         return self::$instance;
     }
@@ -125,8 +154,16 @@ class Database {
             slug_admin TEXT UNIQUE NOT NULL,
             slug_public TEXT UNIQUE NOT NULL,
             is_surprise INTEGER DEFAULT 1,
+            hub_visible INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+        )");
+
+        // Table d'historique des slugs de profils (gèle les URLs publiques déjà partagées)
+        $db->exec("CREATE TABLE IF NOT EXISTS profile_slug_history (
+            slug TEXT PRIMARY KEY,
+            profile_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )");
 
         // Table des articles (items)

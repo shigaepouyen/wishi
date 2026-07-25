@@ -36,6 +36,12 @@ l'effet de surprise.
 
 -   **URLs propres (slugs) :** aucun ID technique n'est visible. Les
     partages utilisent des slugs lisibles et personnalisés pour chaque profil et chaque liste.
+-   **Hub public par personne :** chaque profil dispose d'une adresse
+    publique lisible (ex : `wishi.shi-ga.net/zoe`) qui regroupe ses listes
+    partagées, pour envoyer un seul lien aux proches au lieu d'un par liste.
+-   **Listes privées par défaut :** une liste n'apparaît dans ce hub que si
+    son propriétaire active « Visible dans le hub public » dans ses réglages.
+    Sinon elle reste accessible uniquement via son lien direct.
 -   **Connexion admin simple :** chaque profil peut se déverrouiller avec un PIN à 4 chiffres, soit depuis le hub, soit directement depuis l'URL de son univers sur iPhone.
 -   **Lien admin secret de secours :** chaque profil conserve aussi un lien admin personnel qui peut rouvrir une session sécurisée ou servir à recréer un raccourci iPhone.
 -   **Système de réservation :** la famille peut réserver un cadeau en
@@ -140,6 +146,7 @@ l'écran d'accueil sur iPhone.
      ├─ universe.php   # Univers d'un profil + écran de déverrouillage PIN
      ├─ list.php       # Gestion d'une liste (Admin)
      ├─ view.php       # Consultation d'une liste (Public)
+     ├─ profile.php    # Hub public d'un profil (listes visibles uniquement)
      └─ api/           # Endpoints JSON (scrape, add, reserve...)
 
     src/

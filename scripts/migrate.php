@@ -2,55 +2,14 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Utils\Database;
+use App\Utils\Security;
 
 try {
     $db = Database::getConnection();
     echo "--- Initialisation de la base Wishi ---\n";
 
-    // 1. Création des tables
-    $sql = "
-    -- Table des PROFILS
-    CREATE TABLE IF NOT EXISTS profiles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        slug TEXT UNIQUE NOT NULL,
-        emoji TEXT,
-        color TEXT DEFAULT 'indigo'
-    );
-
-    -- Table des LISTES
-    CREATE TABLE IF NOT EXISTS lists (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        profile_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        slug_admin TEXT UNIQUE NOT NULL,
-        slug_public TEXT UNIQUE NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
-    );
-
-    -- Table des SOUHAITS
-    CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        list_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        price DECIMAL(10, 2),
-        currency TEXT DEFAULT 'EUR',
-        price_eur REAL,
-        url TEXT,
-        image_url TEXT,
-        description TEXT,
-        category TEXT,
-        priority INTEGER DEFAULT 1,
-        position INTEGER DEFAULT 0,
-        is_taken INTEGER DEFAULT 0,
-        taken_by TEXT,
-        donor_email TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
-    );";
-
-    $db->exec($sql);
+    // 1. Création des tables (source de vérité unique : Database::init())
+    echo Database::init() . "\n";
     echo "[OK] Tables créées avec succès.\n";
 
     // 2. Insertion des données de base (si la table est vide)
@@ -61,9 +20,13 @@ try {
             ['Zoé', 'zoe', '🦄', 'rose'],
         ];
 
-        $stmt = $db->prepare("INSERT INTO profiles (name, slug, emoji, color) VALUES (?, ?, ?, ?)");
+        $stmt = $db->prepare("INSERT INTO profiles (name, slug, admin_slug, admin_pin_hash, emoji, color) VALUES (?, ?, ?, ?, ?, ?)");
+        $historyStmt = $db->prepare("INSERT OR IGNORE INTO profile_slug_history (slug, profile_id) VALUES (?, ?)");
         foreach ($profiles as $p) {
-            $stmt->execute($p);
+            $adminSlug = bin2hex(random_bytes(16));
+            $adminPinHash = Security::hashAdminPin(Security::defaultAdminPin());
+            $stmt->execute([$p[0], $p[1], $adminSlug, $adminPinHash, $p[2], $p[3]]);
+            $historyStmt->execute([$p[1], (int)$db->lastInsertId()]);
         }
         echo "[OK] Profils de base (Zoé, Chloé, Papa) insérés.\n";
     }
