@@ -67,6 +67,15 @@ class Database {
                     self::$instance->exec("ALTER TABLE lists ADD COLUMN is_surprise INTEGER DEFAULT 1;");
                 }
 
+                // Migration : assure l'existence de la colonne 'hub_visible' dans 'lists'
+                $hasHubVisible = false;
+                foreach ($listColumns as $col) {
+                    if ($col['name'] === 'hub_visible') $hasHubVisible = true;
+                }
+                if (!$hasHubVisible) {
+                    self::$instance->exec("ALTER TABLE lists ADD COLUMN hub_visible INTEGER DEFAULT 0;");
+                }
+
                 // Migration : assure l'existence de la colonne 'admin_slug' dans 'profiles'
                 $profileColumns = self::$instance->query("PRAGMA table_info(profiles)")->fetchAll();
                 $hasProfileAdminSlug = false;
@@ -125,6 +134,7 @@ class Database {
             slug_admin TEXT UNIQUE NOT NULL,
             slug_public TEXT UNIQUE NOT NULL,
             is_surprise INTEGER DEFAULT 1,
+            hub_visible INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
         )");
