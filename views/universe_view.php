@@ -1,5 +1,9 @@
 <?php
 $color = $profile['color'] ?: 'indigo';
+$hubVisibleCount = 0;
+foreach ($lists as $l) {
+    if (!empty($l['hub_visible'])) $hubVisibleCount++;
+}
 ?>
 <div class="max-w-4xl mx-auto" x-data="{
     createModal: false,
@@ -41,6 +45,25 @@ $color = $profile['color'] ?: 'indigo';
             </p>
         </div>
     </header>
+
+    <div class="bg-white rounded-2xl p-6 mb-8 shadow-sm border border-slate-100" x-data="{ copied: false, hubUrl: window.location.origin + '/<?= htmlspecialchars($profile['slug'], ENT_QUOTES, 'UTF-8') ?>' }">
+        <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-2">Lien public du hub</p>
+        <div class="flex items-center justify-between gap-4">
+            <div class="truncate font-mono text-xs text-slate-500 flex-1" x-text="hubUrl"></div>
+            <button @click="navigator.clipboard.writeText(hubUrl); copied = true; setTimeout(() => copied = false, 2000)" class="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all" :class="copied ? 'bg-green-500 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white'">
+                <svg x-show="!copied" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+                <svg x-show="copied" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span x-text="copied ? 'Copié' : 'Copier'"></span>
+            </button>
+        </div>
+        <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-3">
+            <?php if ($hubVisibleCount > 0): ?>
+                <?= $hubVisibleCount ?> liste<?= $hubVisibleCount > 1 ? 's' : '' ?> visible<?= $hubVisibleCount > 1 ? 's' : '' ?> sur ce lien
+            <?php else: ?>
+                Aucune liste visible sur ce lien pour l'instant
+            <?php endif; ?>
+        </p>
+    </div>
 
     <div class="grid gap-4">
         <?php if (empty($lists)): ?>
