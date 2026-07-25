@@ -1,3 +1,5 @@
+Options -MultiViews
+
 RewriteEngine On
 
 # Ne pas toucher aux fichiers/dossiers existants (api/, assets/, hub.php, manifest.json, ...)
@@ -5,8 +7,12 @@ RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# URL canonique sans slash final : /zoe/ -> /zoe (redirection 301, conserve la query string)
-RewriteRule ^([a-z0-9-]+)/$ /$1 [R=301,L,QSA]
+# URL canonique sans slash final : /zoe/ -> /zoe (redirection 302, conserve la query string)
+RewriteRule ^([a-z0-9-]+)/$ /$1 [R=302,L,QSA,NC]
 
 # Un seul segment de chemin type /zoe -> profile.php?slug=zoe
-RewriteRule ^([a-z0-9-]+)$ profile.php?slug=$1 [L,QSA]
+RewriteRule ^([a-z0-9-]+)$ profile.php?slug=$1 [L,NC]
+
+<IfModule mod_headers.c>
+    Header set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
