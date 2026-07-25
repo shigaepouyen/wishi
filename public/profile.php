@@ -1,17 +1,22 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
 
-$slug = $_GET['slug'] ?? '';
-
-if (!$slug) {
-    http_response_code(404);
-    die("Page introuvable.");
-}
+$slug = strtolower(trim($_GET['slug'] ?? ''));
+$is_public_surface = true;
 
 $controller = new \App\Controllers\ProfileController();
-$data = $controller->publicHub($slug);
+$data = $slug !== '' ? $controller->publicHub($slug) : null;
 
 if (!$data) {
+    // Le slug ne correspond à aucun hub actif : peut-être un ancien slug renommé.
+    if ($slug !== '') {
+        $historical = $controller->resolveHistoricalSlug($slug);
+        if ($historical && $historical['current_slug'] !== $slug) {
+            header('Location: /' . $historical['current_slug'], true, 301);
+            exit;
+        }
+    }
+
     http_response_code(404);
     $title = "Wishi";
     $body_class = "bg-slate-50";
