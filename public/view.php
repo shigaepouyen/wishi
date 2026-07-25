@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
 
+$is_public_surface = true;
+
 $slug = $_GET['s'] ?? '';
 $sort = $_GET['sort'] ?? 'position';
 $catFilter = $_GET['cat'] ?? '';
