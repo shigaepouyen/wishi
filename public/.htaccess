@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Ne pas toucher aux fichiers/dossiers existants (api/, assets/, hub.php, manifest.json, ...)
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Un seul segment de chemin type /zoe -> profile.php?slug=zoe
+RewriteRule ^([a-z0-9-]+)/?$ profile.php?slug=$1 [L,QSA]
