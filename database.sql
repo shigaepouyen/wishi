@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    slug TEXT UNIQUE NOT NULL,       -- Utilisé pour universe.php?slug=zoe
+    slug TEXT UNIQUE NOT NULL,       -- Utilisé pour universe.php?slug=malcolm
     emoji TEXT,                      -- Ex: 🦄, 🎮
     color TEXT DEFAULT 'indigo'      -- Thème visuel (rose, sky, emerald...)
 );

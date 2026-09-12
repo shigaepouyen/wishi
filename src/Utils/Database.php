@@ -135,7 +135,7 @@ class Database {
     public static function init() {
         $db = self::getConnection();
 
-        // NOUVEAU : Table des profils (Zoé, Chloé, etc.)
+        // NOUVEAU : Table des profils
         $db->exec("CREATE TABLE IF NOT EXISTS profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,

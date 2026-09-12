@@ -30,7 +30,7 @@ try {
     $stmtP->execute([$profile_id]);
     $profileName = $stmtP->fetchColumn();
 
-    // 2. On génère le slug public lisible (ex: noel-de-zoe)
+    // 2. On génère le slug public lisible (ex: noel-de-malcolm)
     $slug_public = slugify($name . '-de-' . $profileName);
     
     // Sécurité : si le slug existe déjà, on ajoute un chiffre aléatoire

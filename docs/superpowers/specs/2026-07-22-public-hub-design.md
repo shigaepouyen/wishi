@@ -5,21 +5,21 @@ Date : 2026-07-22
 ## Contexte
 
 Wishi propose déjà le partage d'une liste individuelle via `view.php?s=<slug_public>`.
-Besoin : partager un "hub" regroupant toutes les listes d'un profil (ex : Zoé) avec
-une URL lisible (`https://wishi.shi-ga.net/zoe`), sans authentification, tout en
+Besoin : partager un "hub" regroupant toutes les listes d'un profil (ex : Malcolm) avec
+une URL lisible (`https://wishi.shi-ga.net/malcolm`), sans authentification, tout en
 gardant la possibilité de garder certaines listes strictement liens-privés (non
 listées dans ce hub, mais toujours accessibles par leur lien direct existant).
 
 ## Décisions
 
-- URL propre `wishi.shi-ga.net/zoe` via réécriture Apache (`.htaccess`, mod_rewrite
+- URL propre `wishi.shi-ga.net/malcolm` via réécriture Apache (`.htaccess`, mod_rewrite
   confirmé disponible sur l'hébergement Infomaniak).
 - Nouvelle colonne `lists.hub_visible` (INTEGER DEFAULT 0). `0` = liste privée
   (par défaut, y compris pour les listes existantes après migration). `1` = liste
   listée dans le hub public du profil.
 - `hub_visible` est indépendant de `slug_public` : une liste privée reste
   consultable via son lien direct existant, elle est juste absente du hub.
-- Le slug de profil (`profiles.slug`, ex. "zoe") devient de facto public/devinable
+- Le slug de profil (`profiles.slug`, ex. "malcolm") devient de facto public/devinable
   par cette fonctionnalité. Accepté : même niveau de "secret" que `slug_public`
   des listes (pas de secret cryptographique, juste non indexé). Rien de sensible
   (`admin_pin_hash`, `admin_slug`) n'est exposé par la nouvelle route.
@@ -42,7 +42,7 @@ fraîche) pour inclure `hub_visible INTEGER DEFAULT 0` dans le `CREATE TABLE lis
 Nouveau fichier. Règle mod_rewrite : si la requête ne correspond à aucun fichier
 ni dossier existant (`api/`, `assets/`, `hub.php`, etc. restent atteints
 normalement), réécrire vers `profile.php?slug=$1`. Un seul segment de chemin
-géré (`/zoe`), pas de sous-chemins.
+géré (`/malcolm`), pas de sous-chemins.
 
 ### 3. Contrôleur public de profil (`public/profile.php` + `ProfileController`)
 
@@ -86,15 +86,15 @@ Nouveau fichier, calqué visuellement sur `hub_view.php`/`universe_view.php`
   a le lien/slug, comme le reste de l'app)
 - Pas de renommage/regénération du slug de profil dans cette itération (le
   slug existe déjà, généré à la création du profil)
-- Pas de sous-chemins multiples dans l'URL (`/zoe/autre-chose` non géré)
+- Pas de sous-chemins multiples dans l'URL (`/malcolm/autre-chose` non géré)
 
 ## Tests / vérification
 
 - Migration : lancer sur une base existante, vérifier colonne ajoutée,
   vérifier que les listes existantes ont bien `hub_visible = 0`
-- `/zoe` avec au moins une liste `hub_visible=1` → page publique affiche
+- `/malcolm` avec au moins une liste `hub_visible=1` → page publique affiche
   uniquement les listes visibles, liens fonctionnels vers `view.php`
-- `/zoe` avec profil existant mais toutes listes privées → page "rien à voir
+- `/malcolm` avec profil existant mais toutes listes privées → page "rien à voir
   ici", identique au cas profil inexistant
 - `/slug-inexistant` → même page "rien à voir ici"
 - Toggle dans `list.php` : bascule `hub_visible`, rechargement, liste apparaît/

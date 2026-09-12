@@ -15,7 +15,7 @@ l'effet de surprise.
 ### 🪐 Univers personnalisables
 
 -   **Profils multiples :** créez un espace dédié pour chaque enfant ou
-    parent (ex : Zoé 🦄, Chloé 🎮).
+    parent (ex : Malcolm 🦄, Dewey 🎮).
 -   **Identité visuelle :** chaque profil choisit sa couleur de thème
     (rose, bleu, vert, indigo, orange) et son emoji.
 -   **Zone admin :** modifiez les réglages de l'univers (nom, couleur,
@@ -39,7 +39,7 @@ l'effet de surprise.
 -   **URLs propres (slugs) :** aucun ID technique n'est visible. Les
     partages utilisent des slugs lisibles et personnalisés pour chaque profil et chaque liste.
 -   **Hub public par personne :** chaque profil dispose d'une adresse
-    publique lisible (ex : `wishi.shi-ga.net/zoe`) qui regroupe ses listes
+    publique lisible (ex : `wishi.shi-ga.net/malcolm`) qui regroupe ses listes
     partagées, pour envoyer un seul lien aux proches au lieu d'un par liste.
 -   **Listes privées par défaut :** une liste n'apparaît dans ce hub que si
     son propriétaire active « Visible dans le hub public » dans ses réglages.
@@ -210,4 +210,4 @@ donateurs.
 
 ------------------------------------------------------------------------
 
-Développé avec ❤️ pour Zoé, Soline et toute la famille.
+Développé avec ❤️ pour mes filles et toute la famille.

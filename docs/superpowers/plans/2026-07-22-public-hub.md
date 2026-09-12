@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Permettre de partager une URL publique par profil (`wishi.shi-ga.net/zoe`) qui liste uniquement les listes marquées "visibles dans le hub", les autres restant accessibles uniquement par leur lien direct existant.
+**Goal:** Permettre de partager une URL publique par profil (`wishi.shi-ga.net/malcolm`) qui liste uniquement les listes marquées "visibles dans le hub", les autres restant accessibles uniquement par leur lien direct existant.
 
-**Architecture:** Nouvelle colonne `lists.hub_visible` (défaut privé) ; nouveau contrôleur public `public/profile.php` + `ProfileController::publicHub()` qui ne renvoie que les listes visibles d'un profil trouvé par son `slug` ; nouvelle vue `views/profile_public_view.php` ; règle de réécriture Apache (`public/.htaccess`) qui mappe `/zoe` vers `profile.php?slug=zoe` ; toggle ajouté dans la modale de réglages de liste existante.
+**Architecture:** Nouvelle colonne `lists.hub_visible` (défaut privé) ; nouveau contrôleur public `public/profile.php` + `ProfileController::publicHub()` qui ne renvoie que les listes visibles d'un profil trouvé par son `slug` ; nouvelle vue `views/profile_public_view.php` ; règle de réécriture Apache (`public/.htaccess`) qui mappe `/malcolm` vers `profile.php?slug=malcolm` ; toggle ajouté dans la modale de réglages de liste existante.
 
 **Tech Stack:** PHP 8.1+, PDO/SQLite, Alpine.js, Tailwind (CDN), Apache mod_rewrite.
 
@@ -253,7 +253,7 @@ RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Un seul segment de chemin type /zoe -> profile.php?slug=zoe
+# Un seul segment de chemin type /malcolm -> profile.php?slug=malcolm
 RewriteRule ^([a-z0-9-]+)/?$ profile.php?slug=$1 [L,QSA]
 ```
 
@@ -264,10 +264,10 @@ Sauvegarder dans `public/.htaccess`.
 ```bash
 php -r '
 $tests = [
-    "zoe" => true,
+    "malcolm" => true,
     "chloe-2" => true,
     "api" => true, // matche la regex mais RewriteCond -d empeche la reecriture (dossier existant), verifie a part
-    "zoe/sous-chemin" => false,
+    "malcolm/sous-chemin" => false,
     "" => false,
 ];
 foreach ($tests as $path => $shouldMatch) {
@@ -284,7 +284,7 @@ Expected: toutes les lignes préfixées `OK`.
 ```bash
 cd /Users/jc/Documents/Scripts/shigaepouyen/wishi
 git add public/.htaccess
-git commit -m "Ajoute rewrite Apache pour URL publique de profil (/zoe)"
+git commit -m "Ajoute rewrite Apache pour URL publique de profil (/malcolm)"
 ```
 
 ---
@@ -662,10 +662,10 @@ Confirmer que tous ces noms ne matchent jamais la regex catch-all seule (ils son
 
 Checklist à dérouler :
 - `/hub.php`, `/api/rates.php`, `/manifest.json` répondent comme avant (non cassés par le nouveau `.htaccess`)
-- `/zoe` (ou le slug d'un profil réel avec au moins une liste `hub_visible=1`) affiche le hub public, cartes cliquables vers les listes visibles uniquement
-- `/zoe` sur un profil dont toutes les listes sont privées affiche "Rien à voir ici"
+- `/malcolm` (ou le slug d'un profil réel avec au moins une liste `hub_visible=1`) affiche le hub public, cartes cliquables vers les listes visibles uniquement
+- `/malcolm` sur un profil dont toutes les listes sont privées affiche "Rien à voir ici"
 - `/nimporte-quoi-qui-nexiste-pas` affiche la même page "Rien à voir ici"
-- Toggle dans `list.php` : décocher/cocher "Visible dans le hub public", recharger `/zoe`, vérifier apparition/disparition
+- Toggle dans `list.php` : décocher/cocher "Visible dans le hub public", recharger `/malcolm`, vérifier apparition/disparition
 
 - [ ] **Step 3: Mettre à jour le `readme.md` (section Structure du projet)**
 

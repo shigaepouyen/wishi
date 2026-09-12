@@ -17,7 +17,7 @@ try {
 
     if ($count == 0) {
         $profiles = [
-            ['Zoé', 'zoe', '🦄', 'rose'],
+            ['Malcolm', 'malcolm', '🦄', 'rose'],
         ];
 
         $stmt = $db->prepare("INSERT INTO profiles (name, slug, admin_slug, admin_pin_hash, emoji, color) VALUES (?, ?, ?, ?, ?, ?)");
@@ -28,7 +28,7 @@ try {
             $stmt->execute([$p[0], $p[1], $adminSlug, $adminPinHash, $p[2], $p[3]]);
             $historyStmt->execute([$p[1], (int)$db->lastInsertId()]);
         }
-        echo "[OK] Profils de base (Zoé, Chloé, Papa) insérés.\n";
+        echo "[OK] Profil de base insere.\n";
     }
 
     echo "--- Migration terminée ! ---\n";
