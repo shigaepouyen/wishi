@@ -1,3 +1,5 @@
+![Status: Stable](https://img.shields.io/badge/status-Stable-brightgreen)
+
 # 🎁 Wishi --- L'Univers des Souhaits Familiaux
 
 **Wishi** est une application web légère et élégante conçue pour
