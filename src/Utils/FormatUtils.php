@@ -33,8 +33,14 @@ class FormatUtils {
     /**
      * Formate l'affichage double (EUR en priorité, original si différent)
      */
-    public static function formatDualPrice(float $price, ?string $currency, ?float $priceEur): string {
+    public static function formatDualPrice(?float $price, ?string $currency, ?float $priceEur): string {
         $currency = $currency ?? 'EUR';
+
+        // Aucun prix renseigne : on n'affiche rien plutot que de planter
+        if ($price === null && $priceEur === null) {
+            return '';
+        }
+        $price = $price ?? $priceEur;
 
         // Si c'est déjà de l'EUR ou si on n'a pas de conversion, on affiche normalement
         if ($currency === 'EUR' || !$priceEur) {

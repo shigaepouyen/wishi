@@ -91,11 +91,12 @@
                             <?php if (!empty($item['description'])): ?>
                                 <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2 italic"><?= htmlspecialchars($item['description']) ?></p>
                             <?php endif; ?>
-                            <p class="text-slate-900 mt-1">
-                                <?php
-                                    echo \App\Utils\FormatUtils::formatDualPrice($item['price'], $item['currency'], $item['price_eur']);
-                                ?>
-                            </p>
+                            <?php $priceHtml = \App\Utils\FormatUtils::formatDualPrice($item['price'], $item['currency'], $item['price_eur']); ?>
+                            <?php if ($priceHtml !== ''): ?>
+                                <p class="text-slate-900 mt-1"><?= $priceHtml ?></p>
+                            <?php else: ?>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-300 mt-1">Prix non indiqué</p>
+                            <?php endif; ?>
                         </div>
                     </div>
 
