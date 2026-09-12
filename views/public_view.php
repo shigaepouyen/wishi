@@ -1,25 +1,53 @@
+<?php
+    // Construit un lien interne (filtre, tri, reservations) en respectant la forme d'URL
+    // par laquelle le visiteur est arrive : /<profil>/<liste> ou view.php?s=<slug>.
+    $publicLink = function (array $params = []) use ($publicBaseUrl) {
+        $params = array_filter($params, function ($value) { return $value !== '' && $value !== null; });
+        if (empty($params)) return $publicBaseUrl;
+        $separator = str_contains($publicBaseUrl, '?') ? '&' : '?';
+        return $publicBaseUrl . $separator . http_build_query($params);
+    };
+    $baseParams = ['cat' => $catFilter, 'sort' => $sort, 'show_taken' => $showTaken ? '1' : ''];
+?>
 <div class="max-w-5xl mx-auto py-12 px-4">
+
+    <?php if (!empty($hubUrl)): ?>
+        <nav class="mb-8 flex flex-wrap items-center gap-2">
+            <a href="<?= htmlspecialchars($hubUrl) ?>"
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M15 19l-7-7 7-7"/></svg>
+                L'univers de <?= htmlspecialchars($ownerName) ?>
+            </a>
+            <?php foreach ($hubSiblings as $sibling): ?>
+                <a href="/<?= rawurlencode($data['list']['profile_slug']) ?>/<?= rawurlencode($sibling['slug_hub']) ?>"
+                   class="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-slate-200 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all">
+                    <?= htmlspecialchars($sibling['name']) ?>
+                    <span class="text-slate-300"><?= (int)$sibling['count'] ?></span>
+                </a>
+            <?php endforeach; ?>
+        </nav>
+    <?php endif; ?>
 
     <div class="mb-12 text-center">
         <div class="text-6xl mb-4 transform hover:scale-110 transition-transform duration-500 inline-block">
             <?= $ownerEmoji ?>
         </div>
         <h1 class="text-4xl font-black text-slate-900 tracking-tight">
-            La Liste de <?= htmlspecialchars($ownerName) ?>
+            <?= !empty($hubUrl) ? htmlspecialchars($data['list']['name']) : 'La Liste de ' . htmlspecialchars($ownerName) ?>
         </h1>
         <p class="text-slate-400 mt-1 text-[10px] font-bold uppercase tracking-widest">
-            Offrez un cadeau pour faire plaisir !
+            <?= !empty($hubUrl) ? 'Une liste de ' . htmlspecialchars($ownerName) : 'Offrez un cadeau pour faire plaisir !' ?>
         </p>
     </div>
 
     <div class="mb-10">
         <div class="flex flex-wrap justify-center gap-2">
-            <a href="?s=<?= $slug ?>&sort=<?= $sort ?><?= $showTaken ? '&show_taken=1' : '' ?>"
+            <a href="<?= htmlspecialchars($publicLink(['sort' => $sort, 'show_taken' => $showTaken ? '1' : ''])) ?>"
                class="px-5 py-2.5 rounded-full text-[10px] uppercase tracking-wider font-bold transition-all <?= $catFilter == '' ? "bg-$color-600 text-white shadow-md shadow-$color-100" : 'bg-white text-slate-400 border border-slate-200 hover:border-'.$color.'-300' ?>">
                 Tous
             </a>
             <?php foreach($allCategories as $c): ?>
-                <a href="?s=<?= $slug ?>&cat=<?= urlencode($c) ?>&sort=<?= $sort ?><?= $showTaken ? '&show_taken=1' : '' ?>"
+                <a href="<?= htmlspecialchars($publicLink(['cat' => $c, 'sort' => $sort, 'show_taken' => $showTaken ? '1' : ''])) ?>"
                    class="px-5 py-2.5 rounded-full text-[10px] uppercase tracking-wider font-bold transition-all <?= $catFilter == $c ? "bg-$color-600 text-white shadow-md shadow-$color-100" : 'bg-white text-slate-400 border border-slate-200 hover:border-'.$color.'-300' ?>">
                     <?= htmlspecialchars($c) ?>
                 </a>
@@ -31,7 +59,7 @@
         <div class="flex items-center gap-3">
             <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
                 <input type="checkbox" id="show_taken" <?= $showTaken ? 'checked' : '' ?>
-                       onchange="window.location.href='?s=<?= $slug ?>&cat=<?= urlencode($catFilter) ?>&sort=<?= $sort ?>&show_taken=' + (this.checked ? '1' : '0')"
+                       onchange="window.location.href='<?= htmlspecialchars($publicLink(['cat' => $catFilter, 'sort' => $sort])) ?><?= str_contains($publicLink(['cat' => $catFilter, 'sort' => $sort]), '?') ? '&' : '?' ?>show_taken=' + (this.checked ? '1' : '0')"
                        class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
                 <label for="show_taken" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
             </div>
@@ -47,7 +75,7 @@
 
         <div class="flex items-center gap-3">
             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trier par :</label>
-            <select onchange="window.location.href='?s=<?= $slug ?>&cat=<?= urlencode($catFilter) ?>&sort=' + this.value + '<?= $showTaken ? '&show_taken=1' : '' ?>'"
+            <select onchange="window.location.href='<?= htmlspecialchars($publicLink(['cat' => $catFilter])) ?><?= str_contains($publicLink(['cat' => $catFilter]), '?') ? '&' : '?' ?>sort=' + this.value + '<?= $showTaken ? '&show_taken=1' : '' ?>'"
                     class="bg-white border border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider font-bold rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-<?= $color ?>-500 shadow-sm cursor-pointer transition-all">
                 <option value="priority" <?= ($data['currentSort'] == 'priority' || $data['currentSort'] == 'position') ? 'selected' : '' ?>>✨ Ordre de <?= htmlspecialchars($ownerName) ?></option>
                 <option value="price_asc" <?= $data['currentSort'] == 'price_asc' ? 'selected' : '' ?>>Prix croissant</option>
@@ -68,7 +96,7 @@
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between hover:border-<?= $color ?>-200 hover:shadow-md transition-all duration-300 group <?= $item['priority'] == 3 ? "ring-2 ring-amber-400 ring-offset-2" : '' ?> <?= $item['is_taken'] ? 'opacity-60 grayscale-[0.3]' : '' ?>">
                     <div class="flex gap-5 mb-5">
                         <div class="w-24 h-24 shrink-0 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
-                            <img src="<?= htmlspecialchars($item['image_url'] ?: 'assets/img/wishi-placeholder.png') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <img src="<?= htmlspecialchars($item['image_url'] ?: '/assets/img/wishi-placeholder.png') ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
                             <div class="flex items-center gap-2 mb-1">

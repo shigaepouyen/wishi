@@ -9,6 +9,10 @@ RewriteRule ^ - [L]
 
 # URL canonique sans slash final : /malcolm/ -> /malcolm (redirection 302, conserve la query string)
 RewriteRule ^([a-z0-9-]+)/$ /$1 [R=302,L,QSA,NC]
+RewriteRule ^([a-z0-9-]+)/([a-z0-9-]+)/$ /$1/$2 [R=302,L,QSA,NC]
+
+# Deux segments type /malcolm/livres -> la liste, avec le contexte du hub de malcolm
+RewriteRule ^([a-z0-9-]+)/([a-z0-9-]+)$ view.php?p=$1&l=$2 [L,QSA,NC]
 
 # Un seul segment de chemin type /malcolm -> profile.php?slug=malcolm
 RewriteRule ^([a-z0-9-]+)$ profile.php?slug=$1 [L,NC]

@@ -13,9 +13,7 @@ $name = \App\Utils\Security::sanitizeName($input['name'] ?? null, 120);
 $profile_id = $input['profile_id'] ?? null;
 
 function slugify($text) {
-    $text = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $text);
-    $text = preg_replace('/[^a-z0-9]+/', '-', $text);
-    return trim($text, '-');
+    return \App\Utils\Slug::make($text);
 }
 
 try {
@@ -43,8 +41,11 @@ try {
     // 3. On garde un token pour le slug_admin (plus sûr pour gérer la liste)
     $slug_admin = bin2hex(random_bytes(16));
 
-    $stmt = $db->prepare("INSERT INTO lists (profile_id, name, slug_admin, slug_public, is_surprise) VALUES (?, ?, ?, ?, 1)");
-    $stmt->execute([$profile_id, $name, $slug_admin, $slug_public]);
+    // 4. Slug court, unique au sein du profil, pour l'URL de navigation /<profil>/<liste>
+    $slug_hub = \App\Utils\Slug::uniqueListHubSlug($db, (int)$profile_id, $name);
+
+    $stmt = $db->prepare("INSERT INTO lists (profile_id, name, slug_admin, slug_public, slug_hub, is_surprise) VALUES (?, ?, ?, ?, ?, 1)");
+    $stmt->execute([$profile_id, $name, $slug_admin, $slug_public, $slug_hub]);
 
     \App\Utils\AdminAuth::grantListAccess((int)$db->lastInsertId(), (int)$profile_id);
 

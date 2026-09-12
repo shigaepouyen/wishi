@@ -4,18 +4,54 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $is_public_surface = true;
 
 $slug = $_GET['s'] ?? '';
+$profileSlug = strtolower(trim($_GET['p'] ?? ''));
+$hubSlug = strtolower(trim($_GET['l'] ?? ''));
 $sort = $_GET['sort'] ?? 'position';
 $catFilter = $_GET['cat'] ?? '';
 $showTaken = isset($_GET['show_taken']) && $_GET['show_taken'] == '1';
 
-if (!$slug) die("Lien invalide.");
-
 $controller = new \App\Controllers\ListController();
-$data = $controller->showPublic($slug, $sort, $catFilter, $showTaken);
 
-if (!$data) die("Cette liste n'existe pas.");
+// Deux facons d'arriver sur une liste :
+//  - /<profil>/<liste> : navigation dans un hub public, on garde le contexte du profil
+//  - view.php?s=<slug>  : lien unique partage pour cette liste seule, aucun contexte
+$fromHub = $profileSlug !== '' && $hubSlug !== '';
+
+if ($fromHub) {
+    $data = $controller->showPublicFromHub($profileSlug, $hubSlug, $sort, $catFilter, $showTaken);
+
+    if (!$data) {
+        // Le profil a peut-etre ete renomme : on rejoue le lien sur son slug actuel.
+        $historical = (new \App\Controllers\ProfileController())->resolveHistoricalSlug($profileSlug);
+        if ($historical && $historical['current_slug'] !== $profileSlug) {
+            header('Location: /' . rawurlencode($historical['current_slug']) . '/' . rawurlencode($hubSlug), true, 301);
+            exit;
+        }
+
+        http_response_code(404);
+        die("Cette liste n'existe pas.");
+    }
+} else {
+    if (!$slug) die("Lien invalide.");
+    $data = $controller->showPublic($slug, $sort, $catFilter, $showTaken);
+    if (!$data) {
+        http_response_code(404);
+        die("Cette liste n'existe pas.");
+    }
+}
 
 $allCategories = $controller->getCategories($data['list']['id']);
+
+// Contexte de navigation passe a la vue : base des liens internes et listes voisines
+if ($fromHub) {
+    $publicBaseUrl = '/' . rawurlencode($profileSlug) . '/' . rawurlencode($hubSlug);
+    $hubUrl = '/' . rawurlencode($profileSlug);
+    $hubSiblings = $controller->getHubSiblings((int)$data['list']['profile_id'], (int)$data['list']['id']);
+} else {
+    $publicBaseUrl = 'view.php?s=' . rawurlencode($data['list']['slug_public']);
+    $hubUrl = null;
+    $hubSiblings = [];
+}
 
 // Extraction des infos de l'univers
 $color = $data['list']['color'] ?? 'indigo';
@@ -57,7 +93,7 @@ $extra_js = '
             },
             async confirmGift() {
                 if(!this.donorName) return alert("S\'il vous plaît, indiquez votre nom !");
-                const response = await fetch("api/mark_taken.php", {
+                const response = await fetch("/api/mark_taken.php", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({ item_id: this.selectedItemId, name: this.donorName, email: this.donorEmail })
@@ -72,7 +108,7 @@ $extra_js = '
                     if (!this.cancelEmail) return alert("Veuillez entrer votre email.");
                     body.email = this.cancelEmail;
                 }
-                const response = await fetch("api/cancel_reservation.php", {
+                const response = await fetch("/api/cancel_reservation.php", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify(body)

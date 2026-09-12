@@ -78,6 +78,31 @@ class Database {
                     self::$instance->exec("ALTER TABLE lists ADD COLUMN hub_visible INTEGER DEFAULT 0;");
                 }
 
+                // Migration : assure l'existence de la colonne 'slug_hub' dans 'lists'
+                // (slug court par profil, utilise par les URLs de navigation /<profil>/<liste>)
+                $listColumns = self::$instance->query("PRAGMA table_info(lists)")->fetchAll();
+                $hasSlugHub = false;
+                foreach ($listColumns as $col) {
+                    if ($col['name'] === 'slug_hub') $hasSlugHub = true;
+                }
+                if (!$hasSlugHub) {
+                    self::$instance->exec("ALTER TABLE lists ADD COLUMN slug_hub TEXT;");
+                }
+
+                // Backfill : chaque liste existante recoit un slug court derive de son nom
+                $listsWithoutHubSlug = self::$instance->query(
+                    "SELECT id, profile_id, name FROM lists WHERE slug_hub IS NULL OR slug_hub = ''"
+                )->fetchAll();
+                $hubSlugStmt = self::$instance->prepare("UPDATE lists SET slug_hub = ? WHERE id = ?");
+                foreach ($listsWithoutHubSlug as $listRow) {
+                    $hubSlugStmt->execute([
+                        Slug::uniqueListHubSlug(self::$instance, (int)$listRow['profile_id'], $listRow['name'], (int)$listRow['id']),
+                        $listRow['id'],
+                    ]);
+                }
+
+                self::$instance->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_lists_profile_slug_hub ON lists(profile_id, slug_hub);");
+
                 // Migration : assure l'existence de la colonne 'admin_slug' dans 'profiles'
                 $profileColumns = self::$instance->query("PRAGMA table_info(profiles)")->fetchAll();
                 $hasProfileAdminSlug = false;
@@ -153,6 +178,7 @@ class Database {
             name TEXT NOT NULL,
             slug_admin TEXT UNIQUE NOT NULL,
             slug_public TEXT UNIQUE NOT NULL,
+            slug_hub TEXT, -- Slug court pour les URLs /<profil>/<liste>, unique par profil
             is_surprise INTEGER DEFAULT 1,
             hub_visible INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -113,6 +113,47 @@ class ListController {
     }
 
     /**
+     * Vue publique atteinte depuis le hub d'un profil : /<profil>/<liste>.
+     * Ne repond que si la liste appartient bien a ce profil ET qu'elle est exposee sur le hub,
+     * pour qu'une liste privee ne devienne jamais accessible en devinant une URL.
+     */
+    public function showPublicFromHub(string $profileSlug, string $hubSlug, string $sort = 'position', string $category = '', bool $includeTaken = false): ?array {
+        $db = \App\Utils\Database::getConnection();
+
+        $stmt = $db->prepare("
+            SELECT l.slug_public
+            FROM lists l
+            JOIN profiles p ON l.profile_id = p.id
+            WHERE p.slug = ? AND l.slug_hub = ? AND l.hub_visible = 1
+        ");
+        $stmt->execute([$profileSlug, $hubSlug]);
+        $slugPublic = $stmt->fetchColumn();
+        if (!$slugPublic) return null;
+
+        return $this->showPublic($slugPublic, $sort, $category, $includeTaken);
+    }
+
+    /**
+     * Les autres listes publiques du meme profil, pour naviguer de liste en liste
+     * sans repasser par le hub.
+     */
+    public function getHubSiblings(int $profileId, int $currentListId): array {
+        $db = \App\Utils\Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT id, name, slug_hub,
+                   (SELECT COUNT(*) FROM items WHERE list_id = lists.id AND is_taken = 0) as count
+            FROM lists
+            WHERE profile_id = ? AND hub_visible = 1 AND slug_hub IS NOT NULL AND slug_hub != ''
+            ORDER BY created_at DESC
+        ");
+        $stmt->execute([$profileId]);
+
+        return array_values(array_filter($stmt->fetchAll(), function ($row) use ($currentListId) {
+            return (int)$row['id'] !== $currentListId;
+        }));
+    }
+
+    /**
      * Récupère les catégories uniques pour l'auto-complétion
      */
     public function getCategories(int $listId) {

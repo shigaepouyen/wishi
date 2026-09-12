@@ -111,10 +111,10 @@ class ProfileController {
         }
 
         $stmtLists = $db->prepare("
-            SELECT l.id, l.name, l.slug_public,
+            SELECT l.id, l.name, l.slug_public, l.slug_hub,
             (SELECT COUNT(*) FROM items WHERE list_id = l.id) as count
             FROM lists l
-            WHERE l.profile_id = ? AND l.hub_visible = 1
+            WHERE l.profile_id = ? AND l.hub_visible = 1 AND l.slug_hub IS NOT NULL AND l.slug_hub != ''
             ORDER BY l.created_at DESC
         ");
         $stmtLists->execute([$profile['id']]);
@@ -131,9 +131,7 @@ class ProfileController {
     }
 
     private function slugify($text) {
-        $text = transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $text);
-        $text = preg_replace('/[^a-z0-9]+/', '-', $text);
-        return trim($text, '-');
+        return \App\Utils\Slug::make($text);
     }
 
     /**

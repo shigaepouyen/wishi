@@ -19,7 +19,7 @@
 
         <div class="grid gap-4">
             <?php foreach ($lists as $l): ?>
-                <a href="view.php?s=<?= htmlspecialchars($l['slug_public']) ?>"
+                <a href="/<?= rawurlencode($profile['slug']) ?>/<?= rawurlencode($l['slug_hub']) ?>"
                    class="group bg-white p-6 rounded-2xl flex justify-between items-center shadow-sm border border-slate-100 hover:border-<?= $color ?>-200 hover:shadow-md transition-all">
                     <div class="flex items-center gap-5">
                         <div class="w-12 h-12 bg-<?= $color ?>-50 text-<?= $color ?>-500 rounded-xl flex items-center justify-center text-2xl">
