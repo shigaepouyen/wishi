@@ -57,9 +57,8 @@ $extra_css = '
     .sortable-drag, .sortable-fallback { transition: none !important; z-index: 9999; pointer-events: none !important; }
     #items-grid { -webkit-user-select: none; user-select: none; }
 ';
-$sortableSrc = isset($_GET['debug']) ? 'assets/sortable-debug.js' : 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js';
 $extra_js = '
-<script src="' . htmlspecialchars($sortableSrc) . '"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 function adminList() {
     return {
@@ -97,100 +96,30 @@ function adminList() {
             const el = document.getElementById("items-grid");
             if(!el) return;
 
-            const debug = new URLSearchParams(window.location.search).has("debug");
-            const dnotify = (msg) => { if (debug) window.dispatchEvent(new CustomEvent("notify", { detail: { message: msg, type: "info" } })); };
-
-            if (debug) {
-                const sc = Array.from(document.scripts).find(s => s.src.includes("sortable"));
-                dnotify("debug: script chargé -> " + (sc ? sc.src : "AUCUN TROUVÉ"));
-            }
-
-            if (typeof Sortable !== "undefined" && Sortable.get(el)) {
-                dnotify("debug: initSortable() appelé une 2e fois — instance déjà existante, on ignore");
-                return;
-            }
-
             if (typeof Sortable === "undefined") {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : SortableJS non chargé (bloqué par le réseau ?)", type: "error" } }));
                 return;
             }
 
-            let dbgDragging = false;
-            let dbgMoveCount = 0;
-            let dbgOnMoveCount = 0;
-            let dbgLastTarget = null;
-            let dbgLastLogTime = 0;
-            if (debug) {
-                const sampleUnderPointer = (x, y) => {
-                    dbgMoveCount++;
-                    const now = Date.now();
-                    if (now - dbgLastLogTime < 400) return;
-                    dbgLastLogTime = now;
-                    const under = document.elementFromPoint(x, y);
-                    const card = under ? under.closest("[data-id]") : null;
-                    let label;
-                    if (card) label = "carte #" + card.getAttribute("data-id");
-                    else if (under) label = "pas une carte (" + under.tagName + (typeof under.className === "string" && under.className ? "." + under.className.split(" ")[0] : "") + ")";
-                    else label = "rien (hors document)";
-                    if (label !== dbgLastTarget) {
-                        dbgLastTarget = label;
-                        dnotify("debug: sous le doigt -> " + label);
-                    }
-                };
-                document.addEventListener("pointermove", (e) => { if (dbgDragging) sampleUnderPointer(e.clientX, e.clientY); }, { capture: true });
-                document.addEventListener("touchmove", (e) => { if (dbgDragging && e.touches[0]) sampleUnderPointer(e.touches[0].clientX, e.touches[0].clientY); }, { capture: true, passive: true });
-            }
+            if (Sortable.get(el)) return;
 
-            let dbgEmulateCount = 0;
-            let dbgOnDragOverCount = 0;
-            let dbgOnDragOverLastResult = null;
-            let dbgInternalTrace = {};
-
-            if (debug) {
-                window.__WISHI_DEBUG_SORTABLE = (info) => { dbgInternalTrace[info.step] = info; };
-            }
-
-            const sortableInstance = Sortable.create(el, {
+            Sortable.create(el, {
                 animation: 250,
                 handle: ".cursor-move",
                 ghostClass: "sortable-ghost",
                 forceFallback: true,
                 fallbackOnBody: true,
                 fallbackTolerance: 3,
-                supportPointer: false,
                 swapThreshold: 0.65,
                 delay: 150,
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
-                onChoose: () => dnotify("debug: onChoose (poignée saisie)"),
-                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgOnMoveCount = 0; dbgEmulateCount = 0; dbgOnDragOverCount = 0; dbgLastTarget = null; dbgInternalTrace = {}; dnotify("debug: onStart (drag démarré)"); },
-                onMove: (evt) => { dbgOnMoveCount++; return true; },
-                onUnchoose: () => dnotify("debug: onUnchoose (relâché sans drag)"),
                 onEnd: async (evt) => {
-                    dbgDragging = false;
-                    dnotify("debug: compteurs — emulateDragOver:" + dbgEmulateCount + " onDragOver:" + dbgOnDragOverCount + " onMove:" + dbgOnMoveCount + " | " + dbgMoveCount + " mvts captés");
-                    dnotify("debug: trace interne — " + JSON.stringify(dbgInternalTrace));
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
                     await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
                 }
             });
-
-            if (debug) {
-                const proto = Object.getPrototypeOf(sortableInstance);
-                const origEmulate = proto._emulateDragOver;
-                proto._emulateDragOver = function () {
-                    dbgEmulateCount++;
-                    return origEmulate.apply(this, arguments);
-                };
-                const origOnDragOver = proto._onDragOver;
-                proto._onDragOver = function () {
-                    dbgOnDragOverCount++;
-                    const r = origOnDragOver.apply(this, arguments);
-                    dbgOnDragOverLastResult = r;
-                    return r;
-                };
-            }
         },
 
         editItem(item) {
