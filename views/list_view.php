@@ -54,14 +54,14 @@
         </div>
     </div>
 
-    <div id="items-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div id="items-grid" class="flex flex-wrap gap-6">
         <?php if (empty($items)): ?>
-            <div class="lg:col-span-3 text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100">
+            <div class="w-full text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100">
                 <p class="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Cette liste est vide</p>
             </div>
         <?php else: ?>
             <?php foreach ($items as $item): ?>
-                <div data-id="<?= $item['id'] ?>" class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col group relative transition-shadow hover:shadow-md <?= $item['priority'] == 3 ? "ring-1 ring-amber-400" : '' ?>">
+                <div data-id="<?= $item['id'] ?>" class="w-full md:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col group relative transition-shadow hover:shadow-md <?= $item['priority'] == 3 ? "ring-1 ring-amber-400" : '' ?>">
                     
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex items-center cursor-move text-slate-200 hover:text-<?= $color ?>-500 transition-colors">
