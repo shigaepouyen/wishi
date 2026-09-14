@@ -53,6 +53,7 @@ $extra_css = '
     .truncate-2-lines { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .sortable-ghost { opacity: 0.3; background: #f8fafc; border: 2px dashed #cbd5e1; }
+    .cursor-move { touch-action: none; }
 ';
 $extra_js = '
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -96,6 +97,11 @@ function adminList() {
                 animation: 250,
                 handle: ".cursor-move",
                 ghostClass: "sortable-ghost",
+                forceFallback: true,
+                fallbackTolerance: 3,
+                delay: 150,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 5,
                 onEnd: async (evt) => {
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
