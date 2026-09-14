@@ -57,8 +57,9 @@ $extra_css = '
     .sortable-drag, .sortable-fallback { transition: none !important; z-index: 9999; pointer-events: none !important; }
     #items-grid { -webkit-user-select: none; user-select: none; }
 ';
+$sortableSrc = isset($_GET['debug']) ? 'assets/sortable-debug.js' : 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js';
 $extra_js = '
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="' . htmlspecialchars($sortableSrc) . '"></script>
 <script>
 function adminList() {
     return {
@@ -133,6 +134,11 @@ function adminList() {
             let dbgEmulateCount = 0;
             let dbgOnDragOverCount = 0;
             let dbgOnDragOverLastResult = null;
+            let dbgInternalTrace = {};
+
+            if (debug) {
+                window.__WISHI_DEBUG_SORTABLE = (info) => { dbgInternalTrace[info.step] = info; };
+            }
 
             const sortableInstance = Sortable.create(el, {
                 animation: 250,
@@ -147,12 +153,13 @@ function adminList() {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onChoose: () => dnotify("debug: onChoose (poignée saisie)"),
-                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgOnMoveCount = 0; dbgEmulateCount = 0; dbgOnDragOverCount = 0; dbgLastTarget = null; dnotify("debug: onStart (drag démarré)"); },
+                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgOnMoveCount = 0; dbgEmulateCount = 0; dbgOnDragOverCount = 0; dbgLastTarget = null; dbgInternalTrace = {}; dnotify("debug: onStart (drag démarré)"); },
                 onMove: (evt) => { dbgOnMoveCount++; return true; },
                 onUnchoose: () => dnotify("debug: onUnchoose (relâché sans drag)"),
                 onEnd: async (evt) => {
                     dbgDragging = false;
-                    dnotify("debug: onEnd — emulateDragOver:" + dbgEmulateCount + " onDragOver:" + dbgOnDragOverCount + " (dernier résultat:" + dbgOnDragOverLastResult + ") onMove:" + dbgOnMoveCount + " | " + dbgMoveCount + " mvts captés | ordre: " + Array.from(el.querySelectorAll("[data-id]")).slice(0,6).map(x=>x.getAttribute("data-id")).join(","));
+                    dnotify("debug: compteurs — emulateDragOver:" + dbgEmulateCount + " onDragOver:" + dbgOnDragOverCount + " onMove:" + dbgOnMoveCount + " | " + dbgMoveCount + " mvts captés");
+                    dnotify("debug: trace interne — " + JSON.stringify(dbgInternalTrace));
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
                     await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
