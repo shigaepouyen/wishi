@@ -100,6 +100,11 @@ function adminList() {
             const debug = new URLSearchParams(window.location.search).has("debug");
             const dnotify = (msg) => { if (debug) window.dispatchEvent(new CustomEvent("notify", { detail: { message: msg, type: "info" } })); };
 
+            if (debug) {
+                const sc = Array.from(document.scripts).find(s => s.src.includes("sortable"));
+                dnotify("debug: script chargé -> " + (sc ? sc.src : "AUCUN TROUVÉ"));
+            }
+
             if (typeof Sortable === "undefined") {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : SortableJS non chargé (bloqué par le réseau ?)", type: "error" } }));
                 return;
