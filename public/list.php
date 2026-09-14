@@ -106,6 +106,7 @@ function adminList() {
 
             let dbgDragging = false;
             let dbgMoveCount = 0;
+            let dbgOnMoveCount = 0;
             let dbgLastTarget = null;
             let dbgLastLogTime = 0;
             if (debug) {
@@ -141,12 +142,12 @@ function adminList() {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onChoose: () => dnotify("debug: onChoose (poignée saisie)"),
-                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgLastTarget = null; dnotify("debug: onStart (drag démarré)"); },
-                onMove: () => { dnotify("debug: onMove"); return true; },
+                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgOnMoveCount = 0; dbgLastTarget = null; dnotify("debug: onStart (drag démarré)"); },
+                onMove: (evt) => { dbgOnMoveCount++; return true; },
                 onUnchoose: () => dnotify("debug: onUnchoose (relâché sans drag)"),
                 onEnd: async (evt) => {
                     dbgDragging = false;
-                    dnotify("debug: onEnd — " + dbgMoveCount + " évènements de mouvement captés");
+                    dnotify("debug: onEnd — onMove appelé " + dbgOnMoveCount + " fois, " + dbgMoveCount + " évènements de mouvement captés, ordre final: " + Array.from(el.querySelectorAll("[data-id]")).slice(0,6).map(x=>x.getAttribute("data-id")).join(","));
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
                     await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
