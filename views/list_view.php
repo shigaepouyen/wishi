@@ -61,7 +61,7 @@
             </div>
         <?php else: ?>
             <?php foreach ($items as $item): ?>
-                <div data-id="<?= $item['id'] ?>" class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col group relative transition-all hover:shadow-md <?= $item['priority'] == 3 ? "ring-1 ring-amber-400" : '' ?>">
+                <div data-id="<?= $item['id'] ?>" class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col group relative transition-shadow hover:shadow-md <?= $item['priority'] == 3 ? "ring-1 ring-amber-400" : '' ?>">
                     
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex items-center cursor-move text-slate-200 hover:text-<?= $color ?>-500 transition-colors">
