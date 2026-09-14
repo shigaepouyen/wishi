@@ -105,6 +105,11 @@ function adminList() {
                 dnotify("debug: script chargé -> " + (sc ? sc.src : "AUCUN TROUVÉ"));
             }
 
+            if (typeof Sortable !== "undefined" && Sortable.get(el)) {
+                dnotify("debug: initSortable() appelé une 2e fois — instance déjà existante, on ignore");
+                return;
+            }
+
             if (typeof Sortable === "undefined") {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : SortableJS non chargé (bloqué par le réseau ?)", type: "error" } }));
                 return;
