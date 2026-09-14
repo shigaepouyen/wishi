@@ -55,6 +55,7 @@ $extra_css = '
     .sortable-ghost { opacity: 0.3; background: #f8fafc; border: 2px dashed #cbd5e1; }
     .cursor-move { touch-action: none; }
     .sortable-drag, .sortable-fallback { transition: none !important; z-index: 9999; }
+    #items-grid { -webkit-user-select: none; user-select: none; }
 ';
 $extra_js = '
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
