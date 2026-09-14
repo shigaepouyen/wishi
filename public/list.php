@@ -130,7 +130,11 @@ function adminList() {
                 document.addEventListener("touchmove", (e) => { if (dbgDragging && e.touches[0]) sampleUnderPointer(e.touches[0].clientX, e.touches[0].clientY); }, { capture: true, passive: true });
             }
 
-            Sortable.create(el, {
+            let dbgEmulateCount = 0;
+            let dbgOnDragOverCount = 0;
+            let dbgOnDragOverLastResult = null;
+
+            const sortableInstance = Sortable.create(el, {
                 animation: 250,
                 handle: ".cursor-move",
                 ghostClass: "sortable-ghost",
@@ -142,17 +146,33 @@ function adminList() {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onChoose: () => dnotify("debug: onChoose (poignée saisie)"),
-                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgOnMoveCount = 0; dbgLastTarget = null; dnotify("debug: onStart (drag démarré)"); },
+                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgOnMoveCount = 0; dbgEmulateCount = 0; dbgOnDragOverCount = 0; dbgLastTarget = null; dnotify("debug: onStart (drag démarré)"); },
                 onMove: (evt) => { dbgOnMoveCount++; return true; },
                 onUnchoose: () => dnotify("debug: onUnchoose (relâché sans drag)"),
                 onEnd: async (evt) => {
                     dbgDragging = false;
-                    dnotify("debug: onEnd — onMove appelé " + dbgOnMoveCount + " fois, " + dbgMoveCount + " évènements de mouvement captés, ordre final: " + Array.from(el.querySelectorAll("[data-id]")).slice(0,6).map(x=>x.getAttribute("data-id")).join(","));
+                    dnotify("debug: onEnd — emulateDragOver:" + dbgEmulateCount + " onDragOver:" + dbgOnDragOverCount + " (dernier résultat:" + dbgOnDragOverLastResult + ") onMove:" + dbgOnMoveCount + " | " + dbgMoveCount + " mvts captés | ordre: " + Array.from(el.querySelectorAll("[data-id]")).slice(0,6).map(x=>x.getAttribute("data-id")).join(","));
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
                     await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
                 }
             });
+
+            if (debug) {
+                const proto = Object.getPrototypeOf(sortableInstance);
+                const origEmulate = proto._emulateDragOver;
+                proto._emulateDragOver = function () {
+                    dbgEmulateCount++;
+                    return origEmulate.apply(this, arguments);
+                };
+                const origOnDragOver = proto._onDragOver;
+                proto._onDragOver = function () {
+                    dbgOnDragOverCount++;
+                    const r = origOnDragOver.apply(this, arguments);
+                    dbgOnDragOverLastResult = r;
+                    return r;
+                };
+            }
         },
 
         editItem(item) {
