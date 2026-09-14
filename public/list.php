@@ -93,6 +93,15 @@ function adminList() {
         initSortable() {
             const el = document.getElementById("items-grid");
             if(!el) return;
+
+            const debug = new URLSearchParams(window.location.search).has("debug");
+            const dnotify = (msg) => { if (debug) window.dispatchEvent(new CustomEvent("notify", { detail: { message: msg, type: "info" } })); };
+
+            if (typeof Sortable === "undefined") {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Erreur : SortableJS non chargé (bloqué par le réseau ?)", type: "error" } }));
+                return;
+            }
+
             Sortable.create(el, {
                 animation: 250,
                 handle: ".cursor-move",
@@ -104,7 +113,12 @@ function adminList() {
                 delay: 150,
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
+                onChoose: () => dnotify("debug: onChoose (poignée saisie)"),
+                onStart: () => dnotify("debug: onStart (drag démarré)"),
+                onMove: () => { dnotify("debug: onMove"); return true; },
+                onUnchoose: () => dnotify("debug: onUnchoose (relâché sans drag)"),
                 onEnd: async (evt) => {
+                    dnotify("debug: onEnd (drag terminé, envoi reorder.php)");
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
                     await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
