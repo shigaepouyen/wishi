@@ -124,9 +124,9 @@
                 <div class="grid grid-cols-2 gap-8">
                     <div>
                         <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Prix</label>
-                        <div class="flex items-center gap-2">
-                            <input type="number" step="0.01" x-model="form.price" class="flex-grow border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-lg bg-transparent">
-                            <select x-model="form.currency" class="border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold bg-transparent cursor-pointer">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <input type="number" step="0.01" x-model="form.price" class="flex-grow min-w-0 border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-lg bg-transparent">
+                            <select x-model="form.currency" class="shrink-0 border-b border-slate-200 py-2 outline-none focus:border-<?= $color ?>-500 font-bold bg-transparent cursor-pointer">
                                 <option value="EUR">€</option>
                                 <option value="USD">$</option>
                                 <option value="GBP">£</option>
