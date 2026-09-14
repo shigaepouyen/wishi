@@ -104,6 +104,31 @@ function adminList() {
                 return;
             }
 
+            let dbgDragging = false;
+            let dbgMoveCount = 0;
+            let dbgLastTarget = null;
+            let dbgLastLogTime = 0;
+            if (debug) {
+                const sampleUnderPointer = (x, y) => {
+                    dbgMoveCount++;
+                    const now = Date.now();
+                    if (now - dbgLastLogTime < 400) return;
+                    dbgLastLogTime = now;
+                    const under = document.elementFromPoint(x, y);
+                    const card = under ? under.closest("[data-id]") : null;
+                    let label;
+                    if (card) label = "carte #" + card.getAttribute("data-id");
+                    else if (under) label = "pas une carte (" + under.tagName + (typeof under.className === "string" && under.className ? "." + under.className.split(" ")[0] : "") + ")";
+                    else label = "rien (hors document)";
+                    if (label !== dbgLastTarget) {
+                        dbgLastTarget = label;
+                        dnotify("debug: sous le doigt -> " + label);
+                    }
+                };
+                document.addEventListener("pointermove", (e) => { if (dbgDragging) sampleUnderPointer(e.clientX, e.clientY); }, { capture: true });
+                document.addEventListener("touchmove", (e) => { if (dbgDragging && e.touches[0]) sampleUnderPointer(e.touches[0].clientX, e.touches[0].clientY); }, { capture: true, passive: true });
+            }
+
             Sortable.create(el, {
                 animation: 250,
                 handle: ".cursor-move",
@@ -116,11 +141,12 @@ function adminList() {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onChoose: () => dnotify("debug: onChoose (poignée saisie)"),
-                onStart: () => dnotify("debug: onStart (drag démarré)"),
+                onStart: () => { dbgDragging = true; dbgMoveCount = 0; dbgLastTarget = null; dnotify("debug: onStart (drag démarré)"); },
                 onMove: () => { dnotify("debug: onMove"); return true; },
                 onUnchoose: () => dnotify("debug: onUnchoose (relâché sans drag)"),
                 onEnd: async (evt) => {
-                    dnotify("debug: onEnd (drag terminé, envoi reorder.php)");
+                    dbgDragging = false;
+                    dnotify("debug: onEnd — " + dbgMoveCount + " évènements de mouvement captés");
                     const ids = Array.from(el.querySelectorAll("[data-id]"))
                                      .map(item => item.getAttribute("data-id"));
                     await fetch("api/reorder.php", { method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF}, body: JSON.stringify({ ids: ids }) });
