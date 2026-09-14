@@ -141,6 +141,7 @@ function adminList() {
                 forceFallback: true,
                 fallbackOnBody: true,
                 fallbackTolerance: 3,
+                supportPointer: false,
                 swapThreshold: 0.65,
                 delay: 150,
                 delayOnTouchOnly: true,
