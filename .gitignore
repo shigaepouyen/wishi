@@ -4,7 +4,7 @@ composer.lock
 .phpunit.result.cache
 
 # --- Base de données SQLite ---
-# On ignore le fichier de données pour ne pas écraser les cadeaux de Zoé et Chloé 
+# On ignore le fichier de données pour ne pas écraser les vraies listes de la famille
 # lors d'un prochain déploiement.
 *.sqlite
 *.sqlite-journal

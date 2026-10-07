@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Utils\AdminAuth;
 use App\Utils\Database;
+use App\Utils\LoginThrottle;
 use App\Utils\Security;
 use Exception;
 
@@ -290,16 +291,25 @@ class ProfileController {
             return json_encode(['success' => false, 'error' => 'Code PIN invalide.']);
         }
 
+        $locked = LoginThrottle::secondsLocked($profileId);
+        if ($locked > 0) {
+            http_response_code(429);
+            $minutes = (int)ceil($locked / 60);
+            return json_encode(['success' => false, 'error' => "Trop d'essais. Réessaie dans {$minutes} min."]);
+        }
+
         $db = Database::getConnection();
         $stmt = $db->prepare("SELECT admin_pin_hash FROM profiles WHERE id = ?");
         $stmt->execute([$profileId]);
         $hash = $stmt->fetchColumn();
 
         if (!Security::verifyAdminPin($pin, is_string($hash) ? $hash : null)) {
+            LoginThrottle::registerFailure($profileId);
             http_response_code(403);
             return json_encode(['success' => false, 'error' => 'PIN incorrect.']);
         }
 
+        LoginThrottle::registerSuccess($profileId);
         AdminAuth::grantProfileAccess($profileId);
 
         return json_encode([
