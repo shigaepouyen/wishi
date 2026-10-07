@@ -58,7 +58,7 @@ $extra_css = '
     #items-grid { -webkit-user-select: none; user-select: none; }
 ';
 $extra_js = '
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="/assets/vendor/sortable-1.15.0.min.js"></script>
 <script>
 function adminList() {
     return {

@@ -30,3 +30,6 @@ Thumbs.db
 # --- PWA & Build ---
 # Si tu génères tes icônes dynamiquement, décommente la ligne suivante :
 # public/assets/img/icons/
+# --- Tailwind (outillage de build, le CSS compile est versionne) ---
+/tailwind/node_modules/
+/tailwind/package-lock.json

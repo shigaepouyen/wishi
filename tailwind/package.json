@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "description": "Compilation de la feuille Tailwind servie en production (remplace cdn.tailwindcss.com)",
+  "scripts": {
+    "build": "tailwindcss -c tailwind.config.js -i input.css -o ../public/assets/css/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?= $title ?? 'Wishi' ?></title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="/assets/css/tailwind.css">
+    <script defer src="/assets/vendor/alpine-3.17.4.min.js"></script>
 
     <?php if (empty($is_public_surface)): ?>
     <link rel="manifest" href="<?= htmlspecialchars($manifest_href ?? 'manifest.json') ?>">

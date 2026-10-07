@@ -1,8 +1,8 @@
-const CACHE_NAME = 'wishi-v2';
+const CACHE_NAME = 'wishi-v3';
 const ASSETS_TO_CACHE = [
   'hub.php',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js'
+  '/assets/css/tailwind.css',
+  '/assets/vendor/alpine-3.17.4.min.js'
 ];
 
 // Installation du service worker
