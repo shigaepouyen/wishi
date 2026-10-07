@@ -129,7 +129,7 @@ foreach ($lists as $l) {
                 <div>
                     <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Nouveau PIN Admin</label>
                     <input type="password" x-model="profileForm.pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Laisser vide pour garder l'ancien" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-<?= $color ?>-500 font-bold text-xl bg-transparent transition-all">
-                    <p class="text-[10px] text-slate-400 mt-2">4 chiffres. PIN par défaut des profils existants : <span class="font-black text-slate-700">0000</span>.</p>
+                    <p class="text-[10px] text-slate-400 mt-2">4 chiffres.</p>
                 </div>
 
                 <div class="pt-6 space-y-3">

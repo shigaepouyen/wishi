@@ -53,7 +53,7 @@
         <h1 class="text-6xl font-black text-indigo-600 tracking-tight mb-2">Wishi.</h1>
         <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">Le Hub Familial</p>
         <?php if (!$hasAdminAccess && !empty($profiles)): ?>
-            <p class="text-slate-500 mt-4 max-w-xl mx-auto text-sm leading-relaxed">Choisis ton profil puis entre ton PIN à 4 chiffres. Le PIN par défaut des profils existants est <span class="font-black text-slate-900">0000</span>.</p>
+            <p class="text-slate-500 mt-4 max-w-xl mx-auto text-sm leading-relaxed">Choisis ton profil puis entre ton PIN à 4 chiffres.</p>
         <?php endif; ?>
     </header>
 
@@ -130,7 +130,7 @@
 
             <h2 class="text-2xl font-bold text-slate-900 mb-8">Ajouter un profil</h2>
 
-            <div class="space-y-6" x-data="{ name: '', emoji: '👤', color: 'indigo', pin: '0000', loading: false }">
+            <div class="space-y-6" x-data="{ name: '', emoji: '👤', color: 'indigo', pin: '', loading: false }">
                 <div>
                     <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Prénom</label>
                     <input type="text" x-model="name" placeholder="Ex: Maman..." class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-indigo-500 font-bold text-lg bg-transparent">
@@ -155,8 +155,8 @@
 
                 <div>
                     <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">PIN Initial</label>
-                    <input type="password" x-model="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-indigo-500 font-bold text-xl tracking-[0.25em] bg-transparent">
-                    <p class="text-[10px] text-slate-400 mt-2">4 chiffres. Par défaut : <span class="font-black text-slate-700">0000</span>.</p>
+                    <input type="password" x-model="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" class="w-full border-b-2 border-slate-100 py-2 outline-none focus:border-indigo-500 font-bold text-xl tracking-[0.25em] bg-transparent">
+                    <p class="text-[10px] text-slate-400 mt-2">4 chiffres, à choisir.</p>
                 </div>
 
                 <div class="pt-4">
