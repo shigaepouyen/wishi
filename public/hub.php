@@ -11,6 +11,7 @@ try {
     $authorizedProfileIds = AdminAuth::getAuthorizedProfileIds();
     $data = $controller->hub();
     $profiles = $data['profiles'];
+    $sharedLists = $controller->sharedListsByProfile();
     $csrf_token = Security::csrfToken();
     $hasAdminAccess = AdminAuth::hasAnyAdminAccess();
 

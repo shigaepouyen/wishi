@@ -275,7 +275,7 @@ class ItemController {
 
         try {
             $db = \App\Utils\Database::getConnection();
-            $ids = array_values(array_filter(array_map('intval', $ids)));
+            $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
             if (empty($ids)) {
                 return json_encode(['error' => 'Aucun ID valide reçu']);
             }
@@ -294,8 +294,22 @@ class ItemController {
 
             $db->beginTransaction();
 
+            // Avec un filtre de catégorie, seuls les items visibles sont envoyés : on les replace
+            // dans les emplacements qu'ils occupaient parmi toute la liste, puis on renumérote tout.
+            $allStmt = $db->prepare("SELECT id FROM items WHERE list_id = ? ORDER BY position ASC, id DESC");
+            $allStmt->execute([$listIds[0]]);
+            $fullOrder = array_map('intval', $allStmt->fetchAll(PDO::FETCH_COLUMN));
+
+            $moved = array_flip($ids);
+            $queue = $ids;
+            foreach ($fullOrder as $slot => $id) {
+                if (isset($moved[$id])) {
+                    $fullOrder[$slot] = array_shift($queue);
+                }
+            }
+
             $stmt = $db->prepare("UPDATE items SET position = ? WHERE id = ?");
-            foreach ($ids as $index => $id) {
+            foreach ($fullOrder as $index => $id) {
                 $stmt->execute([$index, $id]);
             }
 

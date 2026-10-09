@@ -273,8 +273,8 @@
 
                 <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-4">
                     <div>
-                        <label class="text-sm font-bold text-slate-800">Visible dans le hub public 🏠</label>
-                        <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest leading-tight">Apparaît dans l'univers public du profil. Sinon, uniquement accessible par le lien direct.</p>
+                        <label class="text-sm font-bold text-slate-800">Visible par la famille 🏠</label>
+                        <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest leading-tight">Apparaît sur l'accueil Wishi et dans l'univers public du profil. Sinon, uniquement accessible par le lien direct.</p>
                     </div>
                     <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
                         <input type="checkbox" x-model="listSettings.hub_visible"
