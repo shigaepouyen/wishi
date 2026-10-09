@@ -48,8 +48,9 @@ class ListController {
             $params[] = $category;
         }
         
-        // Vue admin : l'ordre manuel (drag and drop) fait foi, les nouveaux items arrivent en tête
-        $items = $db->prepare($itemsQuery . " ORDER BY position ASC, id DESC");
+        // Vue admin : l'ordre manuel (drag and drop) fait foi, les nouveaux items arrivent en tête.
+        // COALESCE : SQLite trie les positions NULL (anciens items) avant tout le reste.
+        $items = $db->prepare($itemsQuery . " ORDER BY COALESCE(position, 0) ASC, id DESC");
         $items->execute($params);
 
         $categories = $db->prepare("SELECT DISTINCT category FROM items WHERE list_id = ?");
@@ -96,9 +97,9 @@ class ListController {
         switch ($sort) {
             case 'price_asc':  $orderBy = "price ASC"; break;
             case 'price_desc': $orderBy = "price DESC"; break;
-            case 'priority':   $orderBy = "priority DESC, position ASC"; break;
-            case 'manual':     $orderBy = "position ASC"; break;
-            default:           $orderBy = "priority DESC, position ASC"; break;
+            case 'priority':   $orderBy = "priority DESC, COALESCE(position, 0) ASC"; break;
+            case 'manual':     $orderBy = "COALESCE(position, 0) ASC"; break;
+            default:           $orderBy = "priority DESC, COALESCE(position, 0) ASC"; break;
         }
         $query .= " ORDER BY $orderBy";
 

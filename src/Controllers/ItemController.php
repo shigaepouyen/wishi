@@ -73,7 +73,7 @@ class ItemController {
             $db = Database::getConnection();
             
             // On récupère la position min actuelle pour mettre le nouveau cadeau en tête de liste
-            $posStmt = $db->prepare("SELECT MIN(position) FROM items WHERE list_id = ?");
+            $posStmt = $db->prepare("SELECT MIN(COALESCE(position, 0)) FROM items WHERE list_id = ?");
             $posStmt->execute([$input['list_id']]);
             $minPos = (int)$posStmt->fetchColumn();
 
@@ -296,7 +296,7 @@ class ItemController {
 
             // Avec un filtre de catégorie, seuls les items visibles sont envoyés : on les replace
             // dans les emplacements qu'ils occupaient parmi toute la liste, puis on renumérote tout.
-            $allStmt = $db->prepare("SELECT id FROM items WHERE list_id = ? ORDER BY position ASC, id DESC");
+            $allStmt = $db->prepare("SELECT id FROM items WHERE list_id = ? ORDER BY COALESCE(position, 0) ASC, id DESC");
             $allStmt->execute([$listIds[0]]);
             $fullOrder = array_map('intval', $allStmt->fetchAll(PDO::FETCH_COLUMN));
 
