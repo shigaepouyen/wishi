@@ -42,8 +42,11 @@ l'effet de surprise.
     publique lisible (ex : `wishi.shi-ga.net/malcolm`) qui regroupe ses listes
     partagées, pour envoyer un seul lien aux proches au lieu d'un par liste.
 -   **Listes privées par défaut :** une liste n'apparaît dans ce hub que si
-    son propriétaire active « Visible dans le hub public » dans ses réglages.
+    son propriétaire active « Visible par la famille » dans ses réglages.
     Sinon elle reste accessible uniquement via son lien direct.
+-   **Listes de la famille sur l'accueil :** `hub.php` regroupe en haut de page
+    toutes les listes « Visible par la famille », par personne, pour les
+    retrouver sans chercher le lien. L'accès admin (PIN) reste en dessous.
 -   **Connexion admin simple :** chaque profil peut se déverrouiller avec un PIN à 4 chiffres, soit depuis le hub, soit directement depuis l'URL de son univers sur iPhone.
 -   **Lien admin secret de secours :** chaque profil conserve aussi un lien admin personnel qui peut rouvrir une session sécurisée ou servir à recréer un raccourci iPhone.
 -   **Système de réservation :** la famille peut réserver un cadeau en

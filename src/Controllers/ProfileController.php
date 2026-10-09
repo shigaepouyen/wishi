@@ -131,6 +131,47 @@ class ProfileController {
         ];
     }
 
+    /**
+     * Listes partagées de toute la famille pour la page d'accueil (hub.php) :
+     * mêmes règles que publicHub (hub_visible=1 + slug_hub), regroupées par profil.
+     */
+    public function sharedListsByProfile(): array {
+        $db = Database::getConnection();
+
+        $rows = $db->query("
+            SELECT p.id as profile_id, p.name as profile_name, p.slug as profile_slug, p.emoji, p.color,
+                   l.name, l.slug_hub,
+                   (SELECT COUNT(*) FROM items WHERE list_id = l.id) as count
+            FROM lists l
+            JOIN profiles p ON l.profile_id = p.id
+            WHERE l.hub_visible = 1 AND l.slug_hub IS NOT NULL AND l.slug_hub != ''
+            ORDER BY p.name ASC, l.created_at DESC
+        ")->fetchAll();
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $id = (int)$row['profile_id'];
+            if (!isset($grouped[$id])) {
+                $grouped[$id] = [
+                    'profile' => [
+                        'name' => $row['profile_name'],
+                        'slug' => $row['profile_slug'],
+                        'emoji' => $row['emoji'],
+                        'color' => $row['color'],
+                    ],
+                    'lists' => [],
+                ];
+            }
+            $grouped[$id]['lists'][] = [
+                'name' => $row['name'],
+                'slug_hub' => $row['slug_hub'],
+                'count' => (int)$row['count'],
+            ];
+        }
+
+        return array_values($grouped);
+    }
+
     private function slugify($text) {
         return \App\Utils\Slug::make($text);
     }
