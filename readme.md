@@ -44,10 +44,10 @@ l'effet de surprise.
 -   **Listes privées par défaut :** une liste n'apparaît dans ce hub que si
     son propriétaire active « Visible par la famille » dans ses réglages.
     Sinon elle reste accessible uniquement via son lien direct.
--   **Listes de la famille sur l'accueil :** `hub.php` regroupe sous les profils
-    toutes les listes « Visible par la famille », par personne, pour les
-    retrouver sans chercher le lien. Cette section n'apparaît qu'une fois
-    connecté avec un PIN ; l'accès admin reste en dessous.
+-   **Listes de la famille :** un bouton en haut de `hub.php` ouvre
+    `famille.php`, qui regroupe par personne toutes les listes « Visible par
+    la famille » pour les retrouver sans chercher le lien. Réservé aux
+    membres connectés avec leur PIN.
 -   **Connexion admin simple :** chaque profil peut se déverrouiller avec un PIN à 4 chiffres, soit depuis le hub, soit directement depuis l'URL de son univers sur iPhone.
 -   **Lien admin secret de secours :** chaque profil conserve aussi un lien admin personnel qui peut rouvrir une session sécurisée ou servir à recréer un raccourci iPhone.
 -   **Système de réservation :** la famille peut réserver un cadeau en

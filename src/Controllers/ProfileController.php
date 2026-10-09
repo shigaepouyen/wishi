@@ -13,7 +13,7 @@ class ProfileController {
      * ou noms trop proches de routes internes) : jamais attribuables à un profil.
      */
     private const RESERVED_SLUGS = [
-        'api', 'assets', 'hub', 'list', 'view', 'index', 'universe', 'profile',
+        'api', 'assets', 'hub', 'famille', 'list', 'view', 'index', 'universe', 'profile',
         'manifest', 'sw', 'data', 'vendor', 'robots', 'config', 'src', 'views', 'scripts',
     ];
 
