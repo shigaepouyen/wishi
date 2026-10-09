@@ -48,7 +48,8 @@ class ListController {
             $params[] = $category;
         }
         
-        $items = $db->prepare($itemsQuery . " ORDER BY priority DESC, position ASC");
+        // Vue admin : l'ordre manuel (drag and drop) fait foi, les nouveaux items arrivent en tête
+        $items = $db->prepare($itemsQuery . " ORDER BY position ASC, id DESC");
         $items->execute($params);
 
         $categories = $db->prepare("SELECT DISTINCT category FROM items WHERE list_id = ?");
