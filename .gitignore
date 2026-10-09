@@ -33,3 +33,4 @@ Thumbs.db
 # --- Tailwind (outillage de build, le CSS compile est versionne) ---
 /tailwind/node_modules/
 /tailwind/package-lock.json
+/data/app_secret.key
