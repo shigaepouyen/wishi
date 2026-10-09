@@ -72,10 +72,10 @@ class ItemController {
         try {
             $db = Database::getConnection();
             
-            // On récupère la position max actuelle pour mettre le nouveau cadeau à la fin
-            $posStmt = $db->prepare("SELECT MAX(position) FROM items WHERE list_id = ?");
+            // On récupère la position min actuelle pour mettre le nouveau cadeau en tête de liste
+            $posStmt = $db->prepare("SELECT MIN(position) FROM items WHERE list_id = ?");
             $posStmt->execute([$input['list_id']]);
-            $maxPos = (int)$posStmt->fetchColumn();
+            $minPos = (int)$posStmt->fetchColumn();
 
             $price = (float)($input['price'] ?? 0);
             $currency = $input['currency'] ?? 'EUR';
@@ -96,7 +96,7 @@ class ItemController {
                 $priceEur,
                 (int)($input['priority'] ?? 1),
                 $category,
-                $maxPos + 1
+                $minPos - 1
             ]);
 
             return json_encode(['success' => true, 'id' => $db->lastInsertId()]);
