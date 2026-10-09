@@ -11,9 +11,10 @@ try {
     $authorizedProfileIds = AdminAuth::getAuthorizedProfileIds();
     $data = $controller->hub();
     $profiles = $data['profiles'];
-    $sharedLists = $controller->sharedListsByProfile();
     $csrf_token = Security::csrfToken();
     $hasAdminAccess = AdminAuth::hasAnyAdminAccess();
+    // Les listes de la famille ne s'affichent qu'aux membres déjà connectés avec leur PIN
+    $sharedLists = $hasAdminAccess ? $controller->sharedListsByProfile() : [];
 
     $title = "Wishi - Le Hub Familial";
     $apple_mobile_web_app_title = 'Wishi';
