@@ -172,7 +172,7 @@
                     <li class="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/50">
                         <img :src="gift.image_url || '/assets/img/wishi-placeholder.png'" class="w-14 h-14 rounded-xl object-cover bg-white border border-slate-100 shrink-0" alt="">
                         <div class="flex-1 min-w-0">
-                            <p class="font-bold text-slate-800 text-sm leading-tight truncate" x-text="gift.title"></p>
+                            <p class="font-bold text-slate-800 text-sm leading-tight truncate-2-lines" x-text="gift.title"></p>
                             <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1" x-text="gift.list_name"></p>
                         </div>
                         <button @click="cancelMyGift(gift.id)" class="text-[9px] font-bold text-red-400 hover:text-red-600 uppercase tracking-wider shrink-0">Annuler</button>
