@@ -49,7 +49,7 @@ jobs:
       FTP_USER: ${{ secrets.WISHI_FTP_USER }}
       FTP_PASSWORD: ${{ secrets.WISHI_FTP_PASSWORD }}
       # Essai sauf : lancement manuel « essai » décoché, ou push avec DEPLOY_ENABLED=true
-      ESSAI: ${{ (github.event_name == 'workflow_dispatch' && !inputs.essai) || (github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true') && '0' || '1' }}
+      ESSAI: ${{ ((github.event_name == 'workflow_dispatch' && !inputs.essai) || (github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true')) && '0' || '1' }}
     steps:
       - uses: actions/checkout@v4
 
