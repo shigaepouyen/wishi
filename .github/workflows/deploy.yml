@@ -1,0 +1,109 @@
+name: Déploiement Infomaniak
+
+# Envoie Wishi sur https://wishi.shi-ga.net/ en FTPS (pas de SSH sur l'hébergement).
+# Dossier du site : /sites/wishi.shi-ga.net (racine web : public/).
+#
+# Même sécurité que le workflow de Cerebro (après l'incident du 29/10/2026 où un rsync --delete
+# a vidé l'hébergement) :
+# - compte FTP Infomaniak dédié, limité à /sites/wishi.shi-ga.net : sa racine « / » est ce dossier ;
+# - garde-fou : avant tout envoi, la racine distante est listée, l'envoi est refusé si elle contient
+#   autre chose que les fichiers de Wishi ;
+# - aucune suppression côté serveur (pas de --delete) ;
+# - data/ n'est jamais envoyé, sauf son .htaccess : la base SQLite et app_secret.key restent sur le serveur ;
+# - mode essai par défaut : un push n'envoie réellement que si la variable GitHub DEPLOY_ENABLED vaut « true » ;
+#   un lancement manuel (« Run workflow ») est un essai sauf si on décoche « essai ».
+#
+# Secrets à créer une fois : WISHI_FTP_USER et WISHI_FTP_PASSWORD
+#   gh secret set WISHI_FTP_USER -R shigaepouyen/wishi
+#   gh secret set WISHI_FTP_PASSWORD -R shigaepouyen/wishi
+# Activer les envois automatiques, une fois l'essai validé :
+#   gh variable set DEPLOY_ENABLED -b true -R shigaepouyen/wishi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      essai:
+        description: "Essai : vérifier et lister sans rien envoyer"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wishi-deploy
+  cancel-in-progress: false
+
+env:
+  FTP_HOST: 273y4f.ftp.infomaniak.com
+  # Seules entrées admises à la racine distante (fichiers de Wishi et fichiers Infomaniak)
+  ALLOWED: ". .. public src views config data vendor scripts composer.json .htaccess .user.ini .infomaniak-maintenance.html .ftpquota"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FTP_USER: ${{ secrets.WISHI_FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.WISHI_FTP_PASSWORD }}
+      # Essai sauf : lancement manuel « essai » décoché, ou push avec DEPLOY_ENABLED=true
+      ESSAI: ${{ ((github.event_name == 'workflow_dispatch' && !inputs.essai) || (github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true')) && '0' || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl, pdo_sqlite
+          tools: composer:v2
+
+      - name: Vérifier la syntaxe PHP
+        run: |
+          find public src views config -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Dépendances de production
+        run: composer install --no-dev --prefer-dist --no-progress --optimize-autoloader
+
+      # Dossier d'envoi : seulement ce dont l'application a besoin. data/ ne contient que son .htaccess.
+      - name: Préparer le paquet
+        run: |
+          mkdir -p deploy/data
+          cp -r public src views config vendor scripts composer.json deploy/
+          cp data/.htaccess deploy/data/.htaccess
+          find deploy -name '.git*' -prune -exec rm -rf {} +
+          test -f deploy/vendor/autoload.php
+          test -f deploy/public/index.php
+
+      - name: Vérifier les secrets FTP
+        if: env.FTP_USER == '' || env.FTP_PASSWORD == ''
+        run: echo "::warning::Secrets WISHI_FTP_USER / WISHI_FTP_PASSWORD absents, paquet construit mais non envoyé."
+
+      - name: Garde-fou sur la racine distante
+        if: env.FTP_USER != '' && env.FTP_PASSWORD != ''
+        run: |
+          sudo apt-get install -y -qq lftp > /dev/null
+          lftp -u "$FTP_USER,$FTP_PASSWORD" -e "set ftp:ssl-force true; set ssl:verify-certificate yes; cls -1a /; bye" \
+            "ftp://$FTP_HOST" > racine.txt
+          echo "Racine distante :"; cat racine.txt
+          bad=""
+          while IFS= read -r entry; do
+            name="${entry%/}"; name="${name#/}"
+            [ -z "$name" ] && continue
+            case " $ALLOWED " in *" $name "*) ;; *) bad="$bad $name" ;; esac
+          done < racine.txt
+          if [ -n "$bad" ]; then
+            echo "::error::Racine distante inattendue (entrées :$bad). Ce n'est pas le dossier du site Wishi : envoi annulé."
+            exit 1
+          fi
+          echo "✔ Racine distante conforme."
+
+      - name: Envoi sur wishi.shi-ga.net (sans suppression)
+        if: env.FTP_USER != '' && env.FTP_PASSWORD != ''
+        run: |
+          opts="--reverse --verbose --no-perms --only-newer"
+          [ "$ESSAI" = "1" ] && opts="$opts --dry-run" && echo "Mode essai : rien ne sera envoyé."
+          lftp -u "$FTP_USER,$FTP_PASSWORD" -e "set ftp:ssl-force true; set ssl:verify-certificate yes; mirror $opts deploy/ /; bye" \
+            "ftp://$FTP_HOST"
+          [ "$ESSAI" = "1" ] || echo "Publié : https://wishi.shi-ga.net/"
