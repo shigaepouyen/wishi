@@ -8,7 +8,6 @@ $profileSlug = strtolower(trim($_GET['p'] ?? ''));
 $hubSlug = strtolower(trim($_GET['l'] ?? ''));
 $sort = $_GET['sort'] ?? 'position';
 $catFilter = $_GET['cat'] ?? '';
-$showTaken = isset($_GET['show_taken']) && $_GET['show_taken'] == '1';
 
 $controller = new \App\Controllers\ListController();
 
@@ -18,7 +17,7 @@ $controller = new \App\Controllers\ListController();
 $fromHub = $profileSlug !== '' && $hubSlug !== '';
 
 if ($fromHub) {
-    $data = $controller->showPublicFromHub($profileSlug, $hubSlug, $sort, $catFilter, $showTaken);
+    $data = $controller->showPublicFromHub($profileSlug, $hubSlug, $sort, $catFilter);
 
     if (!$data) {
         // Le profil a peut-etre ete renomme : on rejoue le lien sur son slug actuel.
@@ -33,7 +32,7 @@ if ($fromHub) {
     }
 } else {
     if (!$slug) die("Lien invalide.");
-    $data = $controller->showPublic($slug, $sort, $catFilter, $showTaken);
+    $data = $controller->showPublic($slug, $sort, $catFilter);
     if (!$data) {
         http_response_code(404);
         die("Cette liste n'existe pas.");
@@ -75,43 +74,55 @@ $extra_js = '
     function publicList() {
         return {
             modalOpen: false,
-            cancelModalOpen: false,
+            myGiftsOpen: false,
             selectedItemId: null,
             selectedItemTitle: "",
             donorName: "",
             donorEmail: "",
-            cancelEmail: "",
+            myEmail: "",
+            myGifts: [],
+            myGiftsMessage: "",
             openModal(id, title) {
                 this.selectedItemId = id;
                 this.selectedItemTitle = title;
                 this.modalOpen = true;
             },
-            openCancelModal(id, title) {
-                this.selectedItemId = id;
-                this.selectedItemTitle = title;
-                this.cancelModalOpen = true;
+            openMyGifts() {
+                this.myGiftsOpen = true;
+                this.myGiftsMessage = "";
+                // Les cadeaux reserves depuis ce navigateur remontent sans email (cookie).
+                this.loadMyGifts(true);
+            },
+            async loadMyGifts(silent = false) {
+                if (!silent && !this.myEmail) return;
+                const response = await fetch("/api/my_reservations.php", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ list_slug: ' . json_encode($data['list']['slug_public']) . ', email: this.myEmail })
+                });
+                const result = await response.json();
+                if (result.error) { this.myGiftsMessage = result.error; if (!silent) this.myGifts = []; return; }
+                this.myGifts = result.items;
+                if (!silent) this.myGiftsMessage = result.items.length ? "" : "Aucune réservation trouvée avec cet email.";
+            },
+            async cancelMyGift(id) {
+                if (!confirm("Annuler cette réservation ? Le cadeau redeviendra disponible.")) return;
+                const response = await fetch("/api/cancel_reservation.php", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ item_id: id, email: this.myEmail || undefined })
+                });
+                const result = await response.json();
+                if (result.success) { this.myGifts = this.myGifts.filter(g => g.id !== id); window.location.reload(); }
+                else alert(result.error || "Une erreur est survenue");
             },
             async confirmGift() {
-                if(!this.donorName) return alert("S\'il vous plaît, indiquez votre nom !");
+                if(!this.donorName) return alert("S\'il vous plaît, indiquez votre prénom !");
+                if(!this.donorEmail) return alert("L\'email est nécessaire pour retrouver ou annuler votre cadeau.");
                 const response = await fetch("/api/mark_taken.php", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({ item_id: this.selectedItemId, name: this.donorName, email: this.donorEmail })
-                });
-                const result = await response.json();
-                if(result.success) window.location.reload();
-                else alert(result.error || "Une erreur est survenue");
-            },
-            async cancelGift(id, useEmail = false) {
-                const body = { item_id: parseInt(id || this.selectedItemId) };
-                if (useEmail) {
-                    if (!this.cancelEmail) return alert("Veuillez entrer votre email.");
-                    body.email = this.cancelEmail;
-                }
-                const response = await fetch("/api/cancel_reservation.php", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify(body)
                 });
                 const result = await response.json();
                 if(result.success) window.location.reload();
