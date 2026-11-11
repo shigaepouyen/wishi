@@ -28,26 +28,27 @@ class LoginThrottle {
         return $db;
     }
 
-    private static function keys(int $profileId): array {
+    private static function keys(int $profileId, string $scope = ''): array {
+        $prefix = $scope !== '' ? $scope . ':' : '';
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'inconnue';
         return [
-            'device'  => 'device:' . hash('sha256', Security::getAppSecret() . '|' . $ip) . ':' . $profileId,
-            'profile' => 'profile:' . $profileId,
+            'device'  => $prefix . 'device:' . hash('sha256', Security::getAppSecret() . '|' . $ip) . ':' . $profileId,
+            'profile' => $prefix . 'profile:' . $profileId,
         ];
     }
 
     /** Secondes de blocage restantes (0 si l'essai est autorise). */
-    public static function secondsLocked(int $profileId): int {
+    public static function secondsLocked(int $profileId, string $scope = ''): int {
         $db = self::db();
         $stmt = $db->prepare("SELECT MAX(locked_until) FROM login_attempts WHERE key IN (?, ?)");
-        $stmt->execute(array_values(self::keys($profileId)));
+        $stmt->execute(array_values(self::keys($profileId, $scope)));
         return max(0, (int)$stmt->fetchColumn() - time());
     }
 
-    public static function registerFailure(int $profileId): void {
+    public static function registerFailure(int $profileId, string $scope = ''): void {
         $db = self::db();
         $now = time();
-        foreach (self::keys($profileId) as $type => $key) {
+        foreach (self::keys($profileId, $scope) as $type => $key) {
             $rule = self::RULES[$type];
             $stmt = $db->prepare("SELECT failures, window_start FROM login_attempts WHERE key = ?");
             $stmt->execute([$key]);

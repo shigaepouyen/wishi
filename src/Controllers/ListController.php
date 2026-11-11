@@ -66,7 +66,7 @@ class ListController {
     /**
      * Vue Publique : Utilise 'position' comme tri par défaut
      */
-    public function showPublic(string $slug, string $sort = 'position', string $category = '', bool $includeTaken = false) {
+    public function showPublic(string $slug, string $sort = 'position', string $category = '') {
         $db = \App\Utils\Database::getConnection();
         
         // 1. Récupérer la liste avec les infos du profil
@@ -81,10 +81,9 @@ class ListController {
         if (!$list) return null;
 
         // 2. Construire la requête des articles
-        $query = "SELECT * FROM items WHERE list_id = ?";
-        if (!$includeTaken) {
-            $query .= " AND is_taken = 0";
-        }
+        // Les cadeaux reserves ne sont jamais exposes publiquement : ni pour fouiner,
+        // ni pour que la personne gatee devine ce qu'elle va recevoir.
+        $query = "SELECT * FROM items WHERE list_id = ? AND is_taken = 0";
         $params = [$list['id']];
 
         if ($category !== '') {
@@ -118,7 +117,7 @@ class ListController {
      * Ne repond que si la liste appartient bien a ce profil ET qu'elle est exposee sur le hub,
      * pour qu'une liste privee ne devienne jamais accessible en devinant une URL.
      */
-    public function showPublicFromHub(string $profileSlug, string $hubSlug, string $sort = 'position', string $category = '', bool $includeTaken = false): ?array {
+    public function showPublicFromHub(string $profileSlug, string $hubSlug, string $sort = 'position', string $category = ''): ?array {
         $db = \App\Utils\Database::getConnection();
 
         $stmt = $db->prepare("
@@ -131,7 +130,7 @@ class ListController {
         $slugPublic = $stmt->fetchColumn();
         if (!$slugPublic) return null;
 
-        return $this->showPublic($slugPublic, $sort, $category, $includeTaken);
+        return $this->showPublic($slugPublic, $sort, $category);
     }
 
     /**

@@ -118,6 +118,11 @@ class ItemController {
             return json_encode(['error' => 'ID de l\'article manquant']);
         }
 
+        // L'email est la cle pour retrouver ses reservations : sans lui, impossible de les revoir ou de les annuler.
+        if ($email === null) {
+            return json_encode(['error' => 'Un email valide est nécessaire pour retrouver ou annuler votre cadeau.']);
+        }
+
         try {
             $db = \App\Utils\Database::getConnection();
             $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by = ?, donor_email = ? WHERE id = ? AND is_taken = 0");
@@ -140,6 +145,55 @@ class ItemController {
         } catch (\PDOException $e) {
             return json_encode(['error' => 'Erreur base de données : ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * "Mes reservations" : les cadeaux reserves par cet email sur toutes les listes du meme profil,
+     * plus ceux reserves depuis ce navigateur (cookie). Ne renvoie jamais le prenom des donateurs.
+     */
+    public function myReservations() {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $listSlug = is_string($input['list_slug'] ?? null) ? $input['list_slug'] : '';
+        $email = Security::sanitizeOptionalEmail($input['email'] ?? null);
+
+        $db = \App\Utils\Database::getConnection();
+        $stmt = $db->prepare("SELECT profile_id FROM lists WHERE slug_public = ?");
+        $stmt->execute([$listSlug]);
+        $profileId = (int)$stmt->fetchColumn();
+        if (!$profileId) {
+            return json_encode(['error' => 'Liste introuvable.']);
+        }
+
+        $select = "SELECT i.id, i.title, i.image_url, l.name AS list_name
+                   FROM items i JOIN lists l ON i.list_id = l.id
+                   WHERE l.profile_id = ? AND i.is_taken = 1";
+        $items = [];
+
+        if ($email !== null) {
+            if (\App\Utils\LoginThrottle::secondsLocked($profileId, 'reservations') > 0) {
+                return json_encode(['error' => 'Trop d\'essais. Réessayez dans quelques minutes.']);
+            }
+            $stmt = $db->prepare($select . " AND LOWER(i.donor_email) = LOWER(?)");
+            $stmt->execute([$profileId, $email]);
+            $items = $stmt->fetchAll();
+            if (!$items) {
+                \App\Utils\LoginThrottle::registerFailure($profileId, 'reservations');
+            }
+        }
+
+        // Reservations faites depuis ce navigateur (utile quand l'email d'origine n'est plus saisi)
+        $known = array_column($items, 'id');
+        $stmt = $db->prepare($select);
+        $stmt->execute([$profileId]);
+        foreach ($stmt->fetchAll() as $row) {
+            if (!in_array($row['id'], $known) && Security::hasValidReservationCookie((int)$row['id'], $_COOKIE["reserved_item_" . $row['id']] ?? null)) {
+                $items[] = $row;
+            }
+        }
+
+        return json_encode(['success' => true, 'items' => array_map(function ($row) {
+            return ['id' => (int)$row['id'], 'title' => $row['title'], 'image_url' => $row['image_url'], 'list_name' => $row['list_name']];
+        }, $items)]);
     }
 
     public function cancelReservation() {
