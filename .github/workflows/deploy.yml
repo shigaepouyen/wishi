@@ -9,6 +9,7 @@ name: Déploiement Infomaniak
 # - garde-fou : avant tout envoi, la racine distante est listée, l'envoi est refusé si elle contient
 #   autre chose que les fichiers de Wishi ;
 # - aucune suppression côté serveur (pas de --delete) ;
+# - envoi différentiel par empreintes (manifeste .deploy-manifest.json sur le serveur) : seuls les fichiers modifiés partent ;
 # - data/ n'est jamais envoyé, sauf son .htaccess : la base SQLite et app_secret.key restent sur le serveur ;
 # - mode essai par défaut : un push n'envoie réellement que si la variable GitHub DEPLOY_ENABLED vaut « true » ;
 #   un lancement manuel (« Run workflow ») est un essai sauf si on décoche « essai ».
@@ -28,6 +29,10 @@ on:
         description: "Essai : vérifier et lister sans rien envoyer"
         type: boolean
         default: true
+      complet:
+        description: "Renvoyer tous les fichiers (ignore le manifeste ; à utiliser si le serveur a dérivé)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -39,16 +44,17 @@ concurrency:
 env:
   FTP_HOST: 273y4f.ftp.infomaniak.com
   # Seules entrées admises à la racine distante (fichiers de Wishi et fichiers Infomaniak)
-  ALLOWED: ". .. public src views config data vendor scripts composer.json readme.md index.html .htaccess .user.ini .infomaniak-maintenance.html .ftpquota"
+  ALLOWED: ". .. public src views config data vendor scripts composer.json readme.md index.html .deploy-manifest.json .htaccess .user.ini .infomaniak-maintenance.html .ftpquota"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       FTP_USER: ${{ secrets.WISHI_FTP_USER }}
       FTP_PASSWORD: ${{ secrets.WISHI_FTP_PASSWORD }}
       # Essai sauf : lancement manuel « essai » décoché, ou push avec DEPLOY_ENABLED=true
+      COMPLET: ${{ inputs.complet }}
       ESSAI: ${{ ((github.event_name == 'workflow_dispatch' && !inputs.essai) || (github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true')) && '0' || '1' }}
     steps:
       - uses: actions/checkout@v4
@@ -99,11 +105,28 @@ jobs:
           fi
           echo "✔ Racine distante conforme."
 
+      # Envoi différentiel : on compare les empreintes (SHA-256) du paquet avec le manifeste du dernier
+      # déploiement, stocké sur le serveur (.deploy-manifest.json, hors public/). Les dates ne servent à rien ici :
+      # GitHub récupère le code avec des dates toutes récentes, donc tout paraîtrait modifié.
+      - name: Calculer les fichiers à envoyer
+        if: env.FTP_USER != '' && env.FTP_PASSWORD != ''
+        run: |
+          old=-
+          if grep -qx '/\.deploy-manifest\.json' racine.txt; then
+            lftp -u "$FTP_USER,$FTP_PASSWORD" -e "set ftp:ssl-force true; set ssl:verify-certificate yes; get /.deploy-manifest.json -o old-manifest.json; bye" \
+              "ftp://$FTP_HOST"
+            old=old-manifest.json
+          else
+            echo "Pas de manifeste sur le serveur : premier envoi complet."
+          fi
+          flag=""
+          [ "$COMPLET" = "true" ] && flag="--complet"
+          python3 .github/scripts/deploy_plan.py deploy "$old" manifest-out/.deploy-manifest.json plan.lftp $flag
+
       - name: Envoi sur wishi.shi-ga.net (sans suppression)
         if: env.FTP_USER != '' && env.FTP_PASSWORD != ''
         run: |
-          opts="--reverse --verbose --no-perms --only-newer"
-          [ "$ESSAI" = "1" ] && opts="$opts --dry-run" && echo "Mode essai : rien ne sera envoyé."
-          lftp -u "$FTP_USER,$FTP_PASSWORD" -e "set ftp:ssl-force true; set ssl:verify-certificate yes; mirror $opts deploy/ /; bye" \
+          if [ "$ESSAI" = "1" ]; then echo "Mode essai : rien ne sera envoyé."; exit 0; fi
+          lftp -u "$FTP_USER,$FTP_PASSWORD" -e "set ftp:ssl-force true; set ssl:verify-certificate yes; source plan.lftp; bye" \
             "ftp://$FTP_HOST"
-          [ "$ESSAI" = "1" ] || echo "Publié : https://wishi.shi-ga.net/"
+          echo "Publié : https://wishi.shi-ga.net/"
