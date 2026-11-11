@@ -39,7 +39,7 @@ concurrency:
 env:
   FTP_HOST: 273y4f.ftp.infomaniak.com
   # Seules entrées admises à la racine distante (fichiers de Wishi et fichiers Infomaniak)
-  ALLOWED: ". .. public src views config data vendor scripts composer.json .htaccess .user.ini .infomaniak-maintenance.html .ftpquota"
+  ALLOWED: ". .. public src views config data vendor scripts composer.json readme.md index.html .htaccess .user.ini .infomaniak-maintenance.html .ftpquota"
 
 jobs:
   deploy:
