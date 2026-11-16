@@ -20,6 +20,10 @@
             <button @click="settingsModalOpen = true" class="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-<?= $color ?>-600 hover:border-<?= $color ?>-200 transition-all shadow-sm">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </button>
+            <button x-show="aiEnabled && aiItems.length" x-cloak @click="openBulk()" title="Rédiger les descriptions de tous les cadeaux avec l’IA"
+                    class="px-4 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:text-<?= $color ?>-600 hover:border-<?= $color ?>-200 transition-all flex items-center gap-2 shadow-sm text-sm">
+                ✨ <span class="hidden sm:inline">Descriptions IA</span>
+            </button>
             <button @click="shareModalOpen = true" class="px-4 py-2.5 rounded-xl font-bold text-<?= $color ?>-600 bg-white border border-<?= $color ?>-200 hover:bg-<?= $color ?>-50 transition-all flex items-center gap-2 shadow-sm text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
                 Partager
@@ -309,6 +313,61 @@
             <div class="mt-10 flex gap-3 pt-6 border-t border-slate-50">
                 <button @click="saveSettings()" class="flex-1 py-4 bg-<?= $color ?>-600 text-white rounded-xl font-bold hover:brightness-110 shadow-lg shadow-<?= $color ?>-100">Sauvegarder</button>
                 <button @click="settingsModalOpen = false" class="px-6 py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mise à jour des descriptions par IA -->
+    <div x-show="bulk.open" x-cloak class="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" x-transition>
+        <div class="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl relative border border-slate-100">
+            <h2 class="text-xl font-bold text-slate-900 mb-2">✨ Descriptions par l’IA</h2>
+            <p class="text-sm text-slate-500 leading-snug mb-6">L’IA rédige une fiche de 2 à 3 phrases pour chaque cadeau, à partir de son titre, de sa page produit et de la liste. Les descriptions sont enregistrées au fur et à mesure.</p>
+
+            <!-- Choix -->
+            <div x-show="!bulk.running && !bulk.finished" class="space-y-3">
+                <label class="flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all"
+                       :class="bulk.mode === 'missing' ? 'border-<?= $color ?>-200 bg-<?= $color ?>-50' : 'border-slate-200'"
+                       :style="aiMissingCount === 0 ? 'opacity:.5;pointer-events:none' : ''">
+                    <input type="radio" value="missing" x-model="bulk.mode" class="mt-1" :disabled="aiMissingCount === 0">
+                    <span class="text-sm text-slate-600 leading-snug">
+                        <strong class="text-slate-800 block">Seulement ceux sans description</strong>
+                        <span x-text="aiMissingCount + ' cadeau' + (aiMissingCount > 1 ? 'x' : '')"></span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all"
+                       :class="bulk.mode === 'all' ? 'border-<?= $color ?>-200 bg-<?= $color ?>-50' : 'border-slate-200'">
+                    <input type="radio" value="all" x-model="bulk.mode" class="mt-1">
+                    <span class="text-sm text-slate-600 leading-snug">
+                        <strong class="text-slate-800 block">Tous les cadeaux</strong>
+                        <span x-text="aiItems.length + ' cadeau' + (aiItems.length > 1 ? 'x' : '') + ' : les descriptions existantes sont réécrites, en gardant leurs précisions (taille, couleur…)'"></span>
+                    </span>
+                </label>
+                <p class="text-xs text-slate-400 leading-snug px-1">Compte quelques secondes par cadeau. Tu peux arrêter à tout moment.</p>
+                <div class="flex gap-3 pt-3">
+                    <button type="button" @click="bulk.open = false" class="flex-1 py-3 rounded-xl bg-slate-50 text-slate-500 font-bold text-sm hover:bg-slate-100 transition-colors">Annuler</button>
+                    <button type="button" @click="runBulk()" class="flex-[2] py-3 rounded-xl bg-<?= $color ?>-600 text-white font-bold text-sm hover:brightness-110 transition-all">Lancer</button>
+                </div>
+            </div>
+
+            <!-- Progression et bilan -->
+            <div x-show="bulk.running || bulk.finished">
+                <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                    <span x-text="bulk.running ? 'En cours…' : 'Terminé'"></span>
+                    <span x-text="bulk.done + ' / ' + bulk.total"></span>
+                </div>
+                <div class="h-3 rounded-full bg-slate-100 overflow-hidden mb-3">
+                    <div class="h-full bg-<?= $color ?>-600 transition-all duration-500" :style="'width:' + (bulk.total ? Math.round(bulk.done / bulk.total * 100) : 0) + '%'"></div>
+                </div>
+                <p x-show="bulk.running" class="text-xs text-slate-500 truncate mb-4" x-text="'✨ ' + bulk.current"></p>
+                <p x-show="bulk.finished" class="text-sm text-slate-600 mb-3" x-text="bulk.ok + ' description' + (bulk.ok > 1 ? 's' : '') + ' enregistrée' + (bulk.ok > 1 ? 's' : '') + '.'"></p>
+                <p x-show="bulk.message" class="text-sm font-bold text-amber-700 mb-3" x-text="bulk.message"></p>
+                <div x-show="bulk.errors.length" class="mb-4 rounded-2xl bg-red-50 border border-red-100 p-3 max-h-32 overflow-y-auto">
+                    <template x-for="err in bulk.errors"><p class="text-xs text-red-700 leading-snug" x-text="err"></p></template>
+                </div>
+                <button type="button" @click="closeBulk()" :disabled="bulk.running && bulk.stop"
+                        class="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                        :class="bulk.running ? 'bg-slate-50 text-slate-600 hover:bg-slate-100' : 'bg-<?= $color ?>-600 text-white hover:brightness-110'"
+                        x-text="bulk.running ? (bulk.stop ? 'Arrêt après ce cadeau…' : 'Arrêter') : 'Fermer'"></button>
             </div>
         </div>
     </div>

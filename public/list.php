@@ -45,6 +45,18 @@ $ownerName = $list['owner_name'] ?? 'Utilisateur';
 $profileSlug = $list['profile_slug'] ?? '';
 $currentCat = $data['currentCategory'] ?? '';
 $csrf_token = Security::csrfToken();
+
+// Tous les articles de la liste (sans filtre de catégorie) pour la mise à jour par IA
+$aiItems = [];
+if (AiConfig::isEnabled()) {
+    $aiStmt = \App\Utils\Database::getConnection()->prepare(
+        "SELECT id, title, (TRIM(COALESCE(description, '')) != '') AS has_description FROM items WHERE list_id = ? ORDER BY position ASC, id DESC"
+    );
+    $aiStmt->execute([(int)$list['id']]);
+    foreach ($aiStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $aiItems[] = ['id' => (int)$row['id'], 'title' => $row['title'], 'has_description' => (bool)$row['has_description']];
+    }
+}
 $manifest_href = 'manifest.php?profile_id=' . (int)$list['profile_id'];
 
 $title = "Wishi - " . htmlspecialchars($list['name']) . " (Admin)";
@@ -71,6 +83,8 @@ function adminList() {
         aiEnabled: ' . (AiConfig::isEnabled() ? 'true' : 'false') . ',
         describing: false,
         pageDescription: "",
+        aiItems: ' . json_encode($aiItems, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) . ',
+        bulk: { open: false, mode: "missing", running: false, stop: false, done: 0, ok: 0, total: 0, current: "", errors: [], finished: false, message: "" },
         images: [],
         currentImageIndex: 0,
         itemToDelete: null,
@@ -232,6 +246,60 @@ function adminList() {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Impossible de joindre l’IA.", type: auto ? "info" : "error" } }));
             }
             this.describing = false;
+        },
+
+        get aiMissingCount() {
+            return this.aiItems.filter(i => !i.has_description).length;
+        },
+
+        openBulk() {
+            this.bulk = { open: true, mode: this.aiMissingCount > 0 ? "missing" : "all", running: false, stop: false, done: 0, ok: 0, total: 0, current: "", errors: [], finished: false, message: "" };
+        },
+
+        async runBulk() {
+            const queue = this.bulk.mode === "all" ? this.aiItems : this.aiItems.filter(i => !i.has_description);
+            if (!queue.length) return;
+            Object.assign(this.bulk, { running: true, stop: false, done: 0, ok: 0, total: queue.length, errors: [], finished: false, message: "" });
+            let failuresInARow = 0;
+            for (const item of queue) {
+                if (this.bulk.stop) { this.bulk.message = "Arrêté en cours de route."; break; }
+                this.bulk.current = item.title;
+                const started = Date.now();
+                try {
+                    const res = await fetch("api/describe_item.php", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF},
+                        body: JSON.stringify({ list_id: this.listSettings.id, item_id: item.id, save: true })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        item.has_description = true;
+                        this.bulk.ok++;
+                        failuresInARow = 0;
+                    } else {
+                        this.bulk.errors.push(item.title + " : " + (data.error || "échec"));
+                        failuresInARow++;
+                        if (res.status === 429) { this.bulk.message = data.error; break; }
+                    }
+                } catch (e) {
+                    this.bulk.errors.push(item.title + " : connexion impossible");
+                    failuresInARow++;
+                }
+                this.bulk.done++;
+                if (failuresInARow >= 3) { this.bulk.message = "Trois échecs de suite : l’IA semble indisponible, réessaie plus tard."; break; }
+                // Pas plus d’environ 15 appels par minute (limite du quota gratuit de Gemini)
+                const wait = 4000 - (Date.now() - started);
+                if (wait > 0 && this.bulk.done < this.bulk.total && !this.bulk.stop) await new Promise(r => setTimeout(r, wait));
+            }
+            this.bulk.running = false;
+            this.bulk.finished = true;
+            this.bulk.current = "";
+        },
+
+        closeBulk() {
+            if (this.bulk.running) { this.bulk.stop = true; return; }
+            this.bulk.open = false;
+            if (this.bulk.ok > 0) window.location.reload();
         },
 
         async saveEdit() {

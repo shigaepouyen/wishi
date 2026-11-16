@@ -32,7 +32,11 @@ l'effet de surprise.
     de la liste, des autres envies et du texte de la page produit. Le texte arrive dans le
     champ, à relire avant d'enregistrer. Le bouton « ✨ Rédiger / Réécrire avec l'IA » la
     régénère (à l'ajout comme à la modification), en gardant les précisions déjà saisies
-    (taille, couleur…). 60 appels par jour au maximum. Sans clé, le bouton n'apparaît pas.
+    (taille, couleur…). Sans clé, le bouton n'apparaît pas.
+-   **Descriptions IA de toute la liste :** le bouton « ✨ Descriptions IA » de la page admin
+    rédige et enregistre d'un coup les descriptions des cadeaux sans description, ou de tous
+    (en gardant leurs précisions), avec une barre de progression et un bouton Arrêter.
+    Environ un cadeau toutes les 4 secondes ; 200 appels IA par jour au maximum.
 -   **Organisation intelligente :** classez vos idées par catégories avec suggestions automatiques basées sur vos anciens ajouts.
 -   **Drag and drop :** réorganisez les souhaits par simple
     glisser-déposer grâce à SortableJS.
