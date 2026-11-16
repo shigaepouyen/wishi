@@ -153,8 +153,15 @@
                     <datalist id="cat-edit-list"><?php foreach($categories as $cat): ?><option value="<?= htmlspecialchars($cat) ?>"><?php endforeach; ?></datalist>
                 </div>
                 <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Description</label>
-                    <textarea x-model="form.description" rows="3" class="w-full border border-slate-100 rounded-xl p-3 outline-none focus:border-<?= $color ?>-500 font-medium text-sm bg-slate-50 transition-all" placeholder="Détails, taille, couleur..."></textarea>
+                    <div class="flex items-center justify-between gap-3 mb-1">
+                        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Description</label>
+                        <button type="button" x-show="aiEnabled" x-cloak @click="describe()" :disabled="!form.title || describing"
+                                class="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-bold uppercase tracking-wider hover:bg-<?= $color ?>-100 hover:text-<?= $color ?>-600 transition-all disabled:opacity-50">
+                            <span x-show="!describing" x-text="(form.description || '').trim() ? '✨ Réécrire avec l’IA' : '✨ Rédiger avec l’IA'"></span>
+                            <span x-show="describing">✨ L’IA rédige…</span>
+                        </button>
+                    </div>
+                    <textarea x-model="form.description" :disabled="describing" rows="3" class="disabled:opacity-60 w-full border border-slate-100 rounded-xl p-3 outline-none focus:border-<?= $color ?>-500 font-medium text-sm bg-slate-50 transition-all" placeholder="Détails, taille, couleur..."></textarea>
                 </div>
                 <div>
                     <label for="product_url" class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Lien du produit</label>

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Utils\AdminAuth;
+use App\Utils\AiConfig;
 use App\Utils\Security;
 
 AdminAuth::start();
@@ -67,6 +68,9 @@ function adminList() {
         shareModalOpen: false,
         settingsModalOpen: false,
         loading: false,
+        aiEnabled: ' . (AiConfig::isEnabled() ? 'true' : 'false') . ',
+        describing: false,
+        pageDescription: "",
         images: [],
         currentImageIndex: 0,
         itemToDelete: null,
@@ -130,6 +134,8 @@ function adminList() {
             this.images = item.image_url ? [item.image_url] : [];
             this.currentImageIndex = 0;
             this.loading = false;
+            this.describing = false;
+            this.pageDescription = "";
             this.editModalOpen = true;
         },
 
@@ -164,6 +170,7 @@ function adminList() {
                         const scrapedUrl = (data.preserve_source_url && data.source_url) ? data.source_url : data.url;
                         if (scrapedUrl) this.form.url = scrapedUrl;
                         this.form.title = data.title || this.form.title;
+                        this.pageDescription = data.description || "";
                         this.form.price = (data.price && data.price.amount) ? data.price.amount : this.form.price;
                         this.form.currency = (data.price && data.price.currency) ? data.price.currency : this.form.currency;
 
@@ -189,6 +196,42 @@ function adminList() {
                 window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Impossible de récupérer les informations du lien.", type: "error" } }));
             }
             this.loading = false;
+            // Description vide : l’IA en propose une, à relire avant d’enregistrer
+            if (this.aiEnabled && this.form.title && !(this.form.description || "").trim()) {
+                this.describe(true);
+            }
+        },
+
+        async describe(auto = false) {
+            if (!this.form.title || this.describing) return;
+            this.describing = true;
+            try {
+                const res = await fetch("api/describe_item.php", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json", "X-CSRF-Token": window.WISHI_CSRF},
+                    body: JSON.stringify({
+                        list_id: this.listSettings.id,
+                        item_id: this.form.id,
+                        title: this.form.title,
+                        url: this.form.url,
+                        price: this.form.price,
+                        currency: this.form.currency,
+                        category: this.form.category,
+                        notes: auto ? "" : (this.form.description || ""),
+                        page_description: this.pageDescription
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // En automatique, on n’écrase pas ce qui a été tapé entre-temps
+                    if (!auto || !(this.form.description || "").trim()) this.form.description = data.description;
+                } else {
+                    window.dispatchEvent(new CustomEvent("notify", { detail: { message: data.error || "L’IA n’a pas pu rédiger la description.", type: auto ? "info" : "error" } }));
+                }
+            } catch (e) {
+                window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Impossible de joindre l’IA.", type: auto ? "info" : "error" } }));
+            }
+            this.describing = false;
         },
 
         async saveEdit() {
