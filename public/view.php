@@ -104,7 +104,7 @@ include __DIR__ . '/../views/components/share_link_script.php';
             },
             async confirmGift() {
                 this.errorMessage = "";
-                if (!this.donorName.trim()) { this.errorMessage = "Indiquez votre prénom, pour que la famille sache qui s'en occupe."; return; }
+                if (!this.donorName.trim()) { this.errorMessage = "Indique ton prénom, pour que la famille sache qui s'en occupe."; return; }
                 this.sending = true;
                 try {
                     const response = await fetch("/api/mark_taken.php", {
@@ -113,13 +113,13 @@ include __DIR__ . '/../views/components/share_link_script.php';
                         body: JSON.stringify({ item_id: this.selectedItemId, name: this.donorName, email: this.donorEmail })
                     });
                     const result = await response.json();
-                    if (!result.success) { this.errorMessage = result.error || "Une erreur est survenue, réessayez."; return; }
+                    if (!result.success) { this.errorMessage = result.error || "Une erreur est survenue, réessaie."; return; }
                     this.shopUrl = result.shop_url;
                     this.shopLabel = result.shop_label;
                     this.myGiftsLink = result.my_gifts_link;
                     this.reserved = true;
                 } catch (e) {
-                    this.errorMessage = "Impossible de joindre Wishi. Vérifiez votre connexion et réessayez.";
+                    this.errorMessage = "Impossible de joindre Wishi. Vérifie ta connexion et réessaie.";
                 } finally {
                     this.sending = false;
                 }

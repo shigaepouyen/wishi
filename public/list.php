@@ -176,7 +176,7 @@ function adminList() {
                             this.images = this.form.image_url ? [this.form.image_url] : [];
                         }
                         if (data.is_duplicate) {
-                            window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Attention : Ce lien existe déjà dans votre liste !", type: "info" } }));
+                            window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Attention : Ce lien existe déjà dans ta liste !", type: "info" } }));
                         } else {
                             window.dispatchEvent(new CustomEvent("notify", { detail: { message: "Informations mises à jour !", type: "success" } }));
                         }

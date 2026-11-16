@@ -13,9 +13,9 @@
         }
         try {
             await navigator.clipboard.writeText(url);
-            alert("Lien copié ! Collez-le dans un message ou un email pour vous l'envoyer.");
+            alert("Lien copié ! Colle-le dans un message ou un email pour te l'envoyer.");
         } catch (e) {
-            prompt("Copiez ce lien et envoyez-le-vous :", url);
+            prompt("Copie ce lien et envoie-le-toi :", url);
         }
     };
 </script>

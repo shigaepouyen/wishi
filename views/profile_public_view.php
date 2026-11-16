@@ -13,7 +13,7 @@
                 L'univers de <span class="text-<?= $color ?>-600"><?= htmlspecialchars($profile['name']) ?></span>
             </h1>
             <p class="text-slate-400 mt-1 text-[10px] font-bold uppercase tracking-widest">
-                Choisissez une liste pour offrir un cadeau
+                Choisis une liste pour offrir un cadeau
             </p>
             <?php if (!empty($myGiftsCount)): ?>
                 <div class="mt-6"><?php include __DIR__ . '/components/my_gifts_button.php'; ?></div>

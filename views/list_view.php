@@ -214,7 +214,7 @@
             
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Partager la liste</h2>
-                <p class="text-slate-400 text-xs mt-1">Lien public pour vos proches.</p>
+                <p class="text-slate-400 text-xs mt-1">Lien public pour tes proches.</p>
             </div>
 
             <div class="bg-slate-50 rounded-xl p-4 mb-8 flex items-center justify-between border border-slate-100" x-data="{ showUrl: false, shareUrl: window.location.origin + '/view.php?s=<?= $list['slug_public'] ?>' }">

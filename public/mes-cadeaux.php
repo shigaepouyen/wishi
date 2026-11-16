@@ -60,7 +60,7 @@ include __DIR__ . '/../views/components/share_link_script.php';
             searching: false,
             async findByEmail() {
                 this.emailMessage = "";
-                if (!this.email.trim()) { this.emailMessage = "Indiquez l'email utilisé au moment de réserver."; return; }
+                if (!this.email.trim()) { this.emailMessage = "Indique l'email utilisé au moment de réserver."; return; }
                 this.searching = true;
                 try {
                     const response = await fetch("/api/find_gifts.php", {
@@ -72,7 +72,7 @@ include __DIR__ . '/../views/components/share_link_script.php';
                     if (result.success) window.location.reload();
                     else this.emailMessage = result.error || "Une erreur est survenue.";
                 } catch (e) {
-                    this.emailMessage = "Impossible de joindre Wishi. Vérifiez votre connexion.";
+                    this.emailMessage = "Impossible de joindre Wishi. Vérifie ta connexion.";
                 } finally {
                     this.searching = false;
                 }

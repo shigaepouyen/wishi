@@ -114,7 +114,7 @@ class ScraperService {
             if ($this->isTigerProtectChallenge($statusCode, $html)) {
                 $solvedPage = $this->solveTigerProtectChallenge($finalUrl, $html);
                 if (!$solvedPage) {
-                    throw new \Exception("Le site est protégé par un contrôle JavaScript anti-bot. Veuillez remplir le formulaire manuellement.");
+                    throw new \Exception("Le site est protégé par un contrôle JavaScript anti-bot. Remplis le formulaire à la main.");
                 }
 
                 $response = $solvedPage['response'];
@@ -133,14 +133,14 @@ class ScraperService {
 
             if ($statusCode === 403 || $statusCode === 429) {
                 if (str_contains($html, 'Just a moment...') || str_contains($html, 'challenges.cloudflare.com')) {
-                    throw new \Exception("Le site est protégé par Cloudflare (anti-bot). Veuillez remplir le formulaire manuellement.");
+                    throw new \Exception("Le site est protégé par Cloudflare (anti-bot). Remplis le formulaire à la main.");
                 }
                 throw new \Exception("Accès refusé par le site (Erreur $statusCode).");
             }
 
             // Cas spécifique Amazon WAF / Challenge (souvent 202)
             if ($statusCode === 202 || (str_contains($html, 'aws-waf-token') && strlen($html) < 5000)) {
-                throw new \Exception("Le site demande une vérification humaine (WAF). Veuillez remplir le formulaire manuellement.");
+                throw new \Exception("Le site demande une vérification humaine (WAF). Remplis le formulaire à la main.");
             }
 
             if (!$html || strlen($html) < 200) throw new \Exception("La page n'a pas pu être chargée correctement.");

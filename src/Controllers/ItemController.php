@@ -64,7 +64,7 @@ class ItemController {
 
         $url = $input['url'] ?? '';
         if (!empty($url) && $this->isDuplicate((int)$input['list_id'], $url)) {
-            return json_encode(['error' => 'Ce lien existe déjà dans votre liste.']);
+            return json_encode(['error' => 'Ce lien existe déjà dans ta liste.']);
         }
 
         $category = $this->normalizeCategory($input['category'] ?? null);
@@ -121,7 +121,7 @@ class ItemController {
 
         // L'email est facultatif (le navigateur garde deja la trace du cadeau), mais s'il est saisi il doit etre valide.
         if ($rawEmail !== '' && $email === null) {
-            return json_encode(['error' => 'Cet email ne semble pas valide. Corrigez-le ou laissez la case vide.']);
+            return json_encode(['error' => 'Cet email ne semble pas valide. Corrige-le ou laisse la case vide.']);
         }
 
         try {
@@ -227,11 +227,11 @@ class ItemController {
         $input = json_decode(file_get_contents('php://input'), true);
         $email = Security::sanitizeOptionalEmail($input['email'] ?? null);
         if ($email === null) {
-            return json_encode(['error' => 'Indiquez l\'email utilisé au moment de réserver.']);
+            return json_encode(['error' => 'Indique l\'email utilisé au moment de réserver.']);
         }
 
         if (\App\Utils\LoginThrottle::secondsLocked(0, 'gifts') > 0) {
-            return json_encode(['error' => 'Trop d\'essais. Réessayez dans quelques minutes.']);
+            return json_encode(['error' => 'Trop d\'essais. Réessaie dans quelques minutes.']);
         }
 
         $db = \App\Utils\Database::getConnection();
@@ -273,7 +273,7 @@ class ItemController {
             $stmt->execute(['id' => $itemId, 'token' => Security::getDonorToken() ?? '']);
 
             if (!$stmt->fetchColumn()) {
-                return json_encode(['error' => 'Ce cadeau n\'est pas (ou plus) réservé à votre nom.']);
+                return json_encode(['error' => 'Ce cadeau n\'est pas (ou plus) réservé à ton nom.']);
             }
 
             $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL, donor_token = NULL WHERE id = ?");
@@ -308,7 +308,7 @@ class ItemController {
             }
 
             if (!empty($url) && $this->isDuplicate((int)$listId, $url, (int)$id)) {
-                return json_encode(['error' => 'Ce lien existe déjà dans votre liste.']);
+                return json_encode(['error' => 'Ce lien existe déjà dans ta liste.']);
             }
 
             $category = $this->normalizeCategory($input['category'] ?? null);
