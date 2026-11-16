@@ -92,9 +92,6 @@
                                 <?php endif; ?>
                             </div>
                             <h3 class="font-bold text-slate-800 leading-tight truncate-2-lines text-sm"><?= htmlspecialchars($item['title']) ?></h3>
-                            <?php if (!empty($item['description'])): ?>
-                                <p class="text-[10px] text-slate-400 mt-1 leading-tight line-clamp-2 italic"><?= htmlspecialchars($item['description']) ?></p>
-                            <?php endif; ?>
                             <?php $priceHtml = \App\Utils\FormatUtils::formatDualPrice($item['price'], $item['currency'], $item['price_eur']); ?>
                             <?php if ($priceHtml !== ''): ?>
                                 <p class="text-slate-900 mt-1"><?= $priceHtml ?></p>
@@ -103,6 +100,10 @@
                             <?php endif; ?>
                         </div>
                     </div>
+
+                    <?php if (!empty($item['description'])): ?>
+                        <p class="text-xs text-slate-500 leading-snug mb-3"><?= nl2br(htmlspecialchars($item['description'])) ?></p>
+                    <?php endif; ?>
 
                     <div class="flex gap-4 mt-auto pt-3 border-t border-slate-50">
                         <button @click="editItem(<?= htmlspecialchars(json_encode($item)) ?>)" class="text-[9px] font-bold text-slate-400 hover:text-<?= $color ?>-600 uppercase tracking-widest">Modifier</button>
