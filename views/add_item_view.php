@@ -100,8 +100,15 @@
                     </div>
 
                     <div>
-                        <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Description / Notes</label>
-                        <textarea x-model="form.description" rows="4" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-<?= $color ?>-500 focus:bg-white transition-all font-medium text-sm resize-none" placeholder="Ajoute des détails, la taille, la couleur ou pourquoi tu veux ce cadeau..."></textarea>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Description / Notes</label>
+                            <button type="button" x-show="aiEnabled" x-cloak @click="describe()" :disabled="!form.title || describing"
+                                    class="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-<?= $color ?>-100 hover:text-<?= $color ?>-600 transition-all disabled:opacity-50">
+                                <span x-show="!describing" x-text="form.description.trim() ? '✨ Réécrire avec l’IA' : '✨ Rédiger avec l’IA'"></span>
+                                <span x-show="describing">✨ L’IA rédige…</span>
+                            </button>
+                        </div>
+                        <textarea x-model="form.description" :disabled="describing" rows="4" class="disabled:opacity-60 w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-<?= $color ?>-500 focus:bg-white transition-all font-medium text-sm resize-none" placeholder="Ajoute des détails, la taille, la couleur ou pourquoi tu veux ce cadeau..."></textarea>
                     </div>
 
                     <div class="pt-6">

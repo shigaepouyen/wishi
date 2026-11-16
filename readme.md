@@ -27,7 +27,12 @@ l'effet de surprise.
     anniversaire, etc.).
 -   **Scraping magique :** collez un lien (Amazon, Fnac, AliExpress...) et Wishi
     récupère automatiquement le titre, le prix (avec conversion de devise) et la photo haute résolution.
-    La description reste désormais saisie manuellement par l'utilisateur.
+-   **Description par IA (Gemini) :** une fois le lien récupéré, si la description est vide,
+    l'IA rédige une fiche neutre de 2 à 3 phrases à partir du titre, de la catégorie, du nom
+    de la liste, des autres envies et du texte de la page produit. Le texte arrive dans le
+    champ, à relire avant d'enregistrer. Le bouton « ✨ Rédiger / Réécrire avec l'IA » la
+    régénère (à l'ajout comme à la modification), en gardant les précisions déjà saisies
+    (taille, couleur…). 60 appels par jour au maximum. Sans clé, le bouton n'apparaît pas.
 -   **Organisation intelligente :** classez vos idées par catégories avec suggestions automatiques basées sur vos anciens ajouts.
 -   **Drag and drop :** réorganisez les souhaits par simple
     glisser-déposer grâce à SortableJS.
@@ -103,7 +108,19 @@ php init_db.php
 
 Cette commande génère les tables **profiles**, **lists** et **items** avec les contraintes nécessaires et crée un premier profil de démonstration.
 
-### 4. Lancement
+### 4. IA (facultatif)
+
+Les descriptions par IA utilisent Gemini (clé gratuite sur Google AI Studio). Sur le
+serveur, à la racine de Wishi :
+
+``` bash
+./scripts/set_gemini_key.sh
+```
+
+La clé est enregistrée dans `data/gemini.key` (jamais versionnée ni écrasée par le
+déploiement). Pour couper l'IA, supprimez ce fichier.
+
+### 5. Lancement
 
 Utilisez le serveur intégré de PHP pour tester localement :
 
