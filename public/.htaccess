@@ -31,6 +31,9 @@ RewriteRule ^([a-z0-9-]+)/([a-z0-9-]+)/$ /$1/$2 [R=302,L,QSA,NC]
 # Deux segments type /malcolm/livres -> la liste, avec le contexte du hub de malcolm
 RewriteRule ^([a-z0-9-]+)/([a-z0-9-]+)$ view.php?p=$1&l=$2 [L,QSA,NC]
 
+# Page « Mes cadeaux » du visiteur qui offre (avant la regle des profils)
+RewriteRule ^mes-cadeaux$ mes-cadeaux.php [L,QSA,NC]
+
 # Un seul segment de chemin type /malcolm -> profile.php?slug=malcolm
 RewriteRule ^([a-z0-9-]+)$ profile.php?slug=$1 [L,NC]
 

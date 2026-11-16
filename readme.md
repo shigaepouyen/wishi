@@ -51,9 +51,20 @@ l'effet de surprise.
 -   **Connexion admin simple :** chaque profil peut se déverrouiller avec un PIN à 4 chiffres, soit depuis le hub, soit directement depuis l'URL de son univers sur iPhone.
 -   **Lien admin secret de secours :** chaque profil conserve aussi un lien admin personnel qui peut rouvrir une session sécurisée ou servir à recréer un raccourci iPhone.
 -   **Système de réservation :** la famille peut réserver un cadeau en
-    indiquant son nom. L'objet est alors marqué comme « pris » pour
-    éviter les doublons.
--   **Annulation sécurisée :** une réservation peut être annulée immédiatement sur le même appareil pendant 1h, ou plus tard via l'email saisi au moment de la réservation.
+    indiquant son prénom (email facultatif). L'objet disparaît alors de la
+    liste publique pour éviter les doublons. Un encadré « Comment ça marche ? »
+    et la fenêtre de réservation rappellent que Wishi ne commande rien : on
+    achète le cadeau soi-même. Après la réservation, un écran « C'est noté »
+    propose le lien vers la boutique.
+-   **Mes cadeaux (`/mes-cadeaux`) :** chaque navigateur qui réserve reçoit un
+    identifiant anonyme (cookie d'un an, colonne `items.donor_token`). La page
+    regroupe tous ses cadeaux, toutes personnes et listes confondues, avec le
+    lien boutique et « Annuler ». Un bouton « Mes cadeaux (n) » est affiché en
+    haut des listes et des univers publics.
+-   **Changer d'appareil :** un lien personnel (`/mes-cadeaux?k=…`) à s'envoyer
+    par SMS/email via la feuille de partage du téléphone, ou l'email saisi à la
+    réservation (limite d'essais) rattachent un autre appareil au même
+    donateur. Seul le donateur peut annuler sa réservation.
 -   **Mode admin vs public :** le propriétaire gère ses envies (ajout, édition, tri) tandis que les proches accèdent à une vue dédiée pour offrir.
 
 ### 📱 Expérience mobile (PWA)

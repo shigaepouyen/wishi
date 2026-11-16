@@ -15,6 +15,7 @@ class ProfileController {
     private const RESERVED_SLUGS = [
         'api', 'assets', 'hub', 'famille', 'list', 'view', 'index', 'universe', 'profile',
         'manifest', 'sw', 'data', 'vendor', 'robots', 'config', 'src', 'views', 'scripts',
+        'mes-cadeaux',
     ];
 
     public function hub(?array $authorizedProfileIds = null) {

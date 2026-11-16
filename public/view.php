@@ -40,6 +40,7 @@ if ($fromHub) {
 }
 
 $allCategories = $controller->getCategories($data['list']['id']);
+$myGiftsCount = (new \App\Controllers\ItemController())->countMyGifts(\App\Utils\Security::getDonorToken());
 
 // Contexte de navigation passe a la vue : base des liens internes et listes voisines
 if ($fromHub) {
@@ -69,68 +70,64 @@ ob_start();
 include __DIR__ . '/../views/public_view.php';
 $content = ob_get_clean();
 
-$extra_js = '
+ob_start();
+include __DIR__ . '/../views/components/share_link_script.php';
+?>
 <script>
     function publicList() {
         return {
             modalOpen: false,
-            myGiftsOpen: false,
+            reserved: false,
+            sending: false,
+            errorMessage: "",
             selectedItemId: null,
             selectedItemTitle: "",
             donorName: "",
             donorEmail: "",
-            myEmail: "",
-            myGifts: [],
-            myGiftsMessage: "",
+            shopUrl: null,
+            shopLabel: null,
+            myGiftsLink: null,
             openModal(id, title) {
                 this.selectedItemId = id;
                 this.selectedItemTitle = title;
+                this.reserved = false;
+                this.errorMessage = "";
                 this.modalOpen = true;
             },
-            openMyGifts() {
-                this.myGiftsOpen = true;
-                this.myGiftsMessage = "";
-                // Les cadeaux reserves depuis ce navigateur remontent sans email (cookie).
-                this.loadMyGifts(true);
+            closeModal() {
+                this.modalOpen = false;
+                // Le cadeau reserve doit disparaitre de la liste et le compteur « Mes cadeaux » se mettre a jour
+                if (this.reserved) window.location.reload();
             },
-            async loadMyGifts(silent = false) {
-                if (!silent && !this.myEmail) return;
-                const response = await fetch("/api/my_reservations.php", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ list_slug: ' . json_encode($data['list']['slug_public']) . ', email: this.myEmail })
-                });
-                const result = await response.json();
-                if (result.error) { this.myGiftsMessage = result.error; if (!silent) this.myGifts = []; return; }
-                this.myGifts = result.items;
-                if (!silent) this.myGiftsMessage = result.items.length ? "" : "Aucune réservation trouvée avec cet email.";
-            },
-            async cancelMyGift(id) {
-                if (!confirm("Annuler cette réservation ? Le cadeau redeviendra disponible.")) return;
-                const response = await fetch("/api/cancel_reservation.php", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ item_id: id, email: this.myEmail || undefined })
-                });
-                const result = await response.json();
-                if (result.success) { this.myGifts = this.myGifts.filter(g => g.id !== id); window.location.reload(); }
-                else alert(result.error || "Une erreur est survenue");
+            shareMyGiftsLink(url) {
+                window.wishiShareLink(url);
             },
             async confirmGift() {
-                if(!this.donorName) return alert("S\'il vous plaît, indiquez votre prénom !");
-                if(!this.donorEmail) return alert("L\'email est nécessaire pour retrouver ou annuler votre cadeau.");
-                const response = await fetch("/api/mark_taken.php", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ item_id: this.selectedItemId, name: this.donorName, email: this.donorEmail })
-                });
-                const result = await response.json();
-                if(result.success) window.location.reload();
-                else alert(result.error || "Une erreur est survenue");
+                this.errorMessage = "";
+                if (!this.donorName.trim()) { this.errorMessage = "Indiquez votre prénom, pour que la famille sache qui s'en occupe."; return; }
+                this.sending = true;
+                try {
+                    const response = await fetch("/api/mark_taken.php", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ item_id: this.selectedItemId, name: this.donorName, email: this.donorEmail })
+                    });
+                    const result = await response.json();
+                    if (!result.success) { this.errorMessage = result.error || "Une erreur est survenue, réessayez."; return; }
+                    this.shopUrl = result.shop_url;
+                    this.shopLabel = result.shop_label;
+                    this.myGiftsLink = result.my_gifts_link;
+                    this.reserved = true;
+                } catch (e) {
+                    this.errorMessage = "Impossible de joindre Wishi. Vérifiez votre connexion et réessayez.";
+                } finally {
+                    this.sending = false;
+                }
             }
         }
     }
 </script>
-';
+<?php
+$extra_js = ob_get_clean();
 
 include __DIR__ . '/../views/layouts/main.php';

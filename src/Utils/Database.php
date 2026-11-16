@@ -43,6 +43,16 @@ class Database {
                     self::$instance->exec("ALTER TABLE items ADD COLUMN donor_email TEXT;");
                 }
 
+                // Migration : identifiant anonyme du navigateur qui a reserve (page « Mes cadeaux »)
+                $hasDonorToken = false;
+                foreach ($columns as $col) {
+                    if ($col['name'] === 'donor_token') $hasDonorToken = true;
+                }
+                if (!$hasDonorToken) {
+                    self::$instance->exec("ALTER TABLE items ADD COLUMN donor_token TEXT;");
+                }
+                self::$instance->exec("CREATE INDEX IF NOT EXISTS idx_items_donor_token ON items(donor_token);");
+
                 // Migration : assure l'existence de la colonne 'currency'
                 $hasCurrency = false;
                 $hasPriceEur = false;
@@ -209,6 +219,7 @@ class Database {
             is_taken INTEGER DEFAULT 0,
             taken_by TEXT,
             donor_email TEXT,
+            donor_token TEXT,
             FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
         )");
 

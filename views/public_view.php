@@ -39,6 +39,24 @@
         </p>
     </div>
 
+    <section class="mb-10 max-w-3xl mx-auto bg-white rounded-3xl border border-<?= $color ?>-200 p-6 shadow-sm">
+        <h2 class="text-base font-black text-slate-800 mb-4 text-center">Comment ça marche&nbsp;?</h2>
+        <ol class="grid gap-4 sm:grid-cols-3 text-sm text-slate-600 leading-snug">
+            <li class="flex sm:flex-col sm:text-center items-start sm:items-center gap-3">
+                <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">1</span>
+                <span><strong class="text-slate-800">Choisissez</strong> un cadeau dans la liste.</span>
+            </li>
+            <li class="flex sm:flex-col sm:text-center items-start sm:items-center gap-3">
+                <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">2</span>
+                <span><strong class="text-slate-800">Réservez-le</strong>&nbsp;: il disparaît de la liste pour que personne d'autre ne l'achète.</span>
+            </li>
+            <li class="flex sm:flex-col sm:text-center items-start sm:items-center gap-3">
+                <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">3</span>
+                <span><strong class="text-slate-800">Achetez-le vous-même</strong>, en magasin ou en ligne. Wishi ne commande et ne paie rien.</span>
+            </li>
+        </ol>
+    </section>
+
     <div class="mb-10">
         <div class="flex flex-wrap justify-center gap-2">
             <a href="<?= htmlspecialchars($publicLink(['sort' => $sort])) ?>"
@@ -55,10 +73,7 @@
     </div>
 
     <div class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-        <button @click="openMyGifts()" type="button"
-                class="px-5 py-2.5 rounded-full text-[10px] uppercase tracking-wider font-bold bg-white text-slate-500 border border-slate-200 hover:border-<?= $color ?>-300 hover:text-<?= $color ?>-600 transition-all">
-            🎁 Mes réservations
-        </button>
+        <?php include __DIR__ . '/components/my_gifts_button.php'; ?>
 
         <div class="flex items-center gap-3">
             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trier par :</label>
@@ -109,12 +124,12 @@
 
                     <div class="flex gap-2 mt-auto">
                         <?php if($item['url']): ?>
-                        <a href="<?= htmlspecialchars($item['url']) ?>" target="_blank" rel="noreferrer noopener" class="flex-1 py-3 bg-slate-50 text-slate-500 rounded-xl font-bold text-xs text-center hover:bg-slate-100 transition-colors">Voir</a>
+                        <a href="<?= htmlspecialchars($item['url']) ?>" target="_blank" rel="noreferrer noopener" class="flex-1 py-3 bg-slate-50 text-slate-500 rounded-xl font-bold text-sm text-center hover:bg-slate-100 transition-colors">Voir le produit</a>
                         <?php endif; ?>
 
                             <button @click="openModal(<?= $item['id'] ?>, <?= htmlspecialchars(json_encode($item['title']), ENT_QUOTES, 'UTF-8') ?>)"
-                                    class="flex-[2] py-3 bg-<?= $color ?>-600 text-white rounded-xl font-bold hover:brightness-110 shadow-md shadow-<?= $color ?>-100 transition-all text-xs uppercase tracking-wider">
-                                Offrir
+                                    class="flex-[2] py-3 bg-<?= $color ?>-600 text-white rounded-xl font-bold hover:brightness-110 shadow-md shadow-<?= $color ?>-100 transition-all text-sm">
+                                🎁 Je réserve ce cadeau
                             </button>
                     </div>
                 </div>
@@ -122,63 +137,67 @@
         </div>
     <?php endif; ?>
 
-    <!-- Modal Réservation -->
+    <!-- Fenêtre de réservation : formulaire, puis écran « C'est noté » -->
     <div x-show="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" x-cloak x-transition>
-        <div class="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative border border-slate-100" @click.away="modalOpen = false">
-            <button @click="modalOpen = false" class="absolute top-6 right-6 text-slate-300 hover:text-slate-600">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-slate-100" @click.away="closeModal()">
+            <button @click="closeModal()" class="absolute top-6 right-6 text-slate-300 hover:text-slate-600" aria-label="Fermer">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
-            <h3 class="text-2xl font-bold text-slate-900 mb-2">Réserver ce vœu ?</h3>
-            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-tight mb-8" x-text="selectedItemTitle"></p>
+            <!-- Étape 1 : réserver -->
+            <div x-show="!reserved">
+                <h3 class="text-2xl font-bold text-slate-900 mb-1 pr-8">Réserver ce cadeau&nbsp;?</h3>
+                <p class="text-slate-500 text-sm font-bold leading-snug mb-5" x-text="selectedItemTitle"></p>
 
-            <div class="space-y-6">
-                <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2 px-1">Votre Prénom *</label>
-                    <input type="text" x-model="donorName" placeholder="Qui offre ?" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all">
+                <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 mb-6 text-sm text-amber-900 leading-snug">
+                    <p class="font-bold mb-1">Bon à savoir</p>
+                    <p>Wishi <strong>ne commande rien et ne paie rien</strong>. En réservant, vous prévenez simplement la famille que vous vous occupez de ce cadeau. C'est ensuite à vous de l'acheter, où vous voulez.</p>
                 </div>
-                <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2 px-1">Votre Email *</label>
-                    <input type="email" x-model="donorEmail" placeholder="vous@email.com" required class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all text-sm">
-                    <p class="text-[9px] text-slate-400 mt-2 px-1 italic">Jamais affiché ni utilisé autrement : il sert uniquement à retrouver ou annuler vos cadeaux plus tard (sur toutes les listes de <?= htmlspecialchars($ownerName) ?>).</p>
-                </div>
-                <button @click="confirmGift()" class="w-full py-4 bg-<?= $color ?>-600 text-white rounded-xl font-bold shadow-lg shadow-<?= $color ?>-100 hover:brightness-110 active:scale-95 transition-all text-lg">
-                    Confirmer
-                </button>
+
+                <form class="space-y-5" @submit.prevent="confirmGift()">
+                    <div>
+                        <label for="donor_name" class="text-sm font-bold text-slate-700 block mb-2 px-1">Votre prénom</label>
+                        <input id="donor_name" type="text" x-model="donorName" placeholder="Ex : Mamie Jo" required autocomplete="given-name" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all">
+                    </div>
+                    <div>
+                        <label for="donor_email" class="text-sm font-bold text-slate-700 block mb-2 px-1">Votre email <span class="font-medium text-slate-400">(facultatif, conseillé)</span></label>
+                        <input id="donor_email" type="email" x-model="donorEmail" placeholder="vous@email.com" autocomplete="email" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all">
+                        <p class="text-xs text-slate-500 mt-2 px-1 leading-snug">Il sert seulement à retrouver vos cadeaux si vous changez de téléphone ou d'ordinateur. Personne ne le voit, aucun message ne vous sera envoyé.</p>
+                    </div>
+                    <p x-show="errorMessage" x-text="errorMessage" class="text-sm font-bold text-red-600"></p>
+                    <button type="submit" :disabled="sending" class="w-full py-4 bg-<?= $color ?>-600 text-white rounded-xl font-bold shadow-lg shadow-<?= $color ?>-100 hover:brightness-110 active:scale-95 transition-all text-lg disabled:opacity-60">
+                        Oui, je m'en occupe
+                    </button>
+                </form>
             </div>
-        </div>
-    </div>
 
-    <!-- Modal Mes réservations -->
-    <div x-show="myGiftsOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" x-cloak x-transition>
-        <div class="bg-white rounded-3xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-slate-100" @click.away="myGiftsOpen = false">
-            <button @click="myGiftsOpen = false" class="absolute top-6 right-6 text-slate-300 hover:text-slate-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            <!-- Étape 2 : c'est noté -->
+            <div x-show="reserved" class="text-center">
+                <div class="text-5xl mb-3">✅</div>
+                <h3 class="text-2xl font-bold text-slate-900 mb-2">C'est noté&nbsp;!</h3>
+                <p class="text-slate-600 text-sm leading-snug mb-6">
+                    <strong x-text="selectedItemTitle"></strong> est mis de côté pour vous. Personne d'autre ne pourra le réserver.
+                </p>
 
-            <h3 class="text-2xl font-bold text-slate-900 mb-2">Mes réservations</h3>
-            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-tight mb-6">Tout ce que vous offrez à <?= htmlspecialchars($ownerName) ?></p>
+                <div class="rounded-2xl bg-<?= $color ?>-50 border border-<?= $color ?>-200 p-5 mb-6 text-left">
+                    <p class="font-black text-slate-900 mb-1">🛒 Maintenant, à vous de l'acheter</p>
+                    <p class="text-sm text-slate-600 leading-snug">Wishi n'a rien commandé. Achetez ce cadeau vous-même, en magasin ou sur internet.</p>
+                    <a x-show="shopUrl" :href="shopUrl" target="_blank" rel="noreferrer noopener"
+                       class="mt-4 block w-full py-3 bg-<?= $color ?>-600 text-white rounded-xl font-bold text-center hover:brightness-110 transition-all"
+                       x-text="shopLabel ? 'Voir le produit sur ' + shopLabel : 'Voir le produit'"></a>
+                </div>
 
-            <form class="flex gap-2 mb-6" @submit.prevent="loadMyGifts()">
-                <input type="email" x-model="myEmail" placeholder="Votre email de réservation" required
-                       class="flex-1 min-w-0 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all text-sm">
-                <button type="submit" class="px-5 py-3 bg-<?= $color ?>-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:brightness-110 transition-all">Voir</button>
-            </form>
+                <div class="rounded-2xl border border-slate-200 p-5 mb-6 text-left">
+                    <p class="font-bold text-slate-800 mb-1">📋 Retrouver mes cadeaux plus tard</p>
+                    <p class="text-sm text-slate-600 leading-snug">Tous les cadeaux que vous réservez sont rangés dans <strong>«&nbsp;Mes cadeaux&nbsp;»</strong>, en haut de chaque liste. Pour les retrouver sur un autre appareil, envoyez-vous ce lien.</p>
+                    <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                        <a href="/mes-cadeaux" class="py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm text-center hover:bg-slate-100 transition-colors">Voir mes cadeaux</a>
+                        <button type="button" @click="shareMyGiftsLink(myGiftsLink)" class="py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm text-center hover:bg-slate-100 transition-colors">📤 M'envoyer ce lien</button>
+                    </div>
+                </div>
 
-            <p x-show="myGiftsMessage" x-text="myGiftsMessage" class="text-xs text-slate-500 italic mb-4"></p>
-
-            <ul class="space-y-3">
-                <template x-for="gift in myGifts" :key="gift.id">
-                    <li class="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/50">
-                        <img :src="gift.image_url || '/assets/img/wishi-placeholder.png'" class="w-14 h-14 rounded-xl object-cover bg-white border border-slate-100 shrink-0" alt="">
-                        <div class="flex-1 min-w-0">
-                            <p class="font-bold text-slate-800 text-sm leading-tight truncate-2-lines" x-text="gift.title"></p>
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1" x-text="gift.list_name"></p>
-                        </div>
-                        <button @click="cancelMyGift(gift.id)" class="text-[9px] font-bold text-red-400 hover:text-red-600 uppercase tracking-wider shrink-0">Annuler</button>
-                    </li>
-                </template>
-            </ul>
+                <button type="button" @click="closeModal()" class="text-sm font-bold text-slate-500 hover:text-slate-800 underline underline-offset-4">Revenir à la liste</button>
+            </div>
         </div>
     </div>
 </div>

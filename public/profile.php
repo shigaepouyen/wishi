@@ -30,6 +30,7 @@ if (!$data) {
 $profile = $data['profile'];
 $lists = $data['lists'];
 $color = $profile['color'] ?: 'indigo';
+$myGiftsCount = (new \App\Controllers\ItemController())->countMyGifts(\App\Utils\Security::getDonorToken());
 
 $title = "Wishi - L'univers de " . htmlspecialchars($profile['name']);
 $body_class = "bg-$color-50/30";
