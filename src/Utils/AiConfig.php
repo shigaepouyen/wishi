@@ -14,7 +14,7 @@ namespace App\Utils;
 final class AiConfig
 {
     /** Appels Gemini autorises par jour, toutes listes confondues (garde-fou du quota gratuit). */
-    public const DAILY_LIMIT = 60;
+    public const DAILY_LIMIT = 200;
 
     private static ?string $key = null;
 

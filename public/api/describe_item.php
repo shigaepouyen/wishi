@@ -1,6 +1,7 @@
 <?php
 // Redige par IA la description courte d'un article (formulaire d'ajout ou de modification).
-// Rien n'est enregistre ici : le texte revient dans le champ, le proprietaire le relit.
+// Depuis un formulaire, rien n'est enregistre : le texte revient dans le champ, a relire.
+// Avec « save », l'article est relu en base et sa description enregistree (mise a jour de la liste).
 error_reporting(E_ALL & ~E_DEPRECATED);
 ini_set('display_errors', 0);
 set_time_limit(90);
@@ -50,12 +51,36 @@ if (!AiConfig::isEnabled()) {
     describe_fail("L'IA n'est pas configurée sur ce Wishi.", 503);
 }
 
+$db = Database::getConnection();
+
+// Mode « save » (mise à jour de toute la liste) : l'article est relu en base, la description
+// existante sert de notes (pour garder taille, couleur…) et le résultat est enregistré.
+$save = !empty($input['save']);
+if ($save) {
+    if ($itemId <= 0) {
+        describe_fail('Article manquant.');
+    }
+    $itemStmt = $db->prepare("SELECT title, url, price, currency, category, description FROM items WHERE id = ? AND list_id = ?");
+    $itemStmt->execute([$itemId, $listId]);
+    $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$item) {
+        describe_fail('Article introuvable dans cette liste.', 404);
+    }
+    $input = [
+        'title' => $item['title'],
+        'url' => $item['url'],
+        'price' => $item['price'],
+        'currency' => $item['currency'],
+        'category' => $item['category'],
+        'notes' => $item['description'],
+        'page_description' => '',
+    ];
+}
+
 $title = trim((string) ($input['title'] ?? ''));
 if ($title === '') {
     describe_fail("Donne d'abord un titre à l'article.");
 }
-
-$db = Database::getConnection();
 
 $listStmt = $db->prepare("SELECT name FROM lists WHERE id = ?");
 $listStmt->execute([$listId]);
@@ -107,4 +132,8 @@ try {
     describe_fail("L'IA n'a pas pu rédiger la description.", 500);
 }
 
-echo json_encode(['success' => true, 'description' => $description]);
+if ($save) {
+    $db->prepare("UPDATE items SET description = ? WHERE id = ? AND list_id = ?")->execute([$description, $itemId, $listId]);
+}
+
+echo json_encode(['success' => true, 'description' => $description, 'saved' => $save]);
