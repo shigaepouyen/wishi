@@ -23,13 +23,13 @@
             <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
                 <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-4 text-center">Remplissage automatique 🪄</label>
                 <div class="relative">
-                    <input type="url" x-model="form.url" @input.debounce.500ms="scrapeUrl()" placeholder="Collez un lien..." class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 outline-none focus:border-<?= $color ?>-500 focus:bg-white transition-all font-medium text-sm">
+                    <input type="url" x-model="form.url" @input.debounce.500ms="scrapeUrl()" placeholder="Colle un lien..." class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 outline-none focus:border-<?= $color ?>-500 focus:bg-white transition-all font-medium text-sm">
 
                     <div x-show="loading" class="absolute right-3 top-3">
                         <svg class="animate-spin h-5 w-5 text-<?= $color ?>-500" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     </div>
                 </div>
-                <p class="text-[9px] text-slate-400 mt-3 text-center px-4 leading-relaxed">Collez le lien d'un article pour récupérer automatiquement ses infos.</p>
+                <p class="text-[9px] text-slate-400 mt-3 text-center px-4 leading-relaxed">Colle le lien d'un article pour récupérer automatiquement ses infos.</p>
             </div>
 
             <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 overflow-hidden group">
@@ -101,7 +101,7 @@
 
                     <div>
                         <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Description / Notes</label>
-                        <textarea x-model="form.description" rows="4" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-<?= $color ?>-500 focus:bg-white transition-all font-medium text-sm resize-none" placeholder="Ajoutez des détails, la taille, la couleur ou pourquoi vous voulez ce cadeau..."></textarea>
+                        <textarea x-model="form.description" rows="4" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-<?= $color ?>-500 focus:bg-white transition-all font-medium text-sm resize-none" placeholder="Ajoute des détails, la taille, la couleur ou pourquoi tu veux ce cadeau..."></textarea>
                     </div>
 
                     <div class="pt-6">

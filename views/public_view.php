@@ -35,24 +35,29 @@
             <?= !empty($hubUrl) ? htmlspecialchars($data['list']['name']) : 'La Liste de ' . htmlspecialchars($ownerName) ?>
         </h1>
         <p class="text-slate-400 mt-1 text-[10px] font-bold uppercase tracking-widest">
-            <?= !empty($hubUrl) ? 'Une liste de ' . htmlspecialchars($ownerName) : 'Offrez un cadeau pour faire plaisir !' ?>
+            <?= !empty($hubUrl) ? 'Une liste de ' . htmlspecialchars($ownerName) : 'Offre un cadeau pour faire plaisir !' ?>
         </p>
     </div>
 
     <section class="mb-10 max-w-3xl mx-auto bg-white rounded-3xl border border-<?= $color ?>-200 p-6 shadow-sm">
-        <h2 class="text-base font-black text-slate-800 mb-4 text-center">Comment ça marche&nbsp;?</h2>
-        <ol class="grid gap-4 sm:grid-cols-3 text-sm text-slate-600 leading-snug">
-            <li class="flex sm:flex-col sm:text-center items-start sm:items-center gap-3">
+        <h2 class="text-base font-black text-slate-800 mb-1 text-center">Comment ça marche&nbsp;?</h2>
+        <p class="text-sm text-slate-500 text-center mb-5">Quatre étapes, et zéro cadeau en double 🎉</p>
+        <ol class="grid gap-5 sm:grid-cols-2 text-sm text-slate-600 leading-snug">
+            <li class="flex items-start gap-3">
                 <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">1</span>
-                <span><strong class="text-slate-800">Choisissez</strong> un cadeau dans la liste.</span>
+                <span><strong class="text-slate-800 block mb-0.5">Trouve ton bonheur</strong>Parcours la liste et repère le cadeau qui te tente.</span>
             </li>
-            <li class="flex sm:flex-col sm:text-center items-start sm:items-center gap-3">
+            <li class="flex items-start gap-3">
                 <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">2</span>
-                <span><strong class="text-slate-800">Réservez-le</strong>&nbsp;: il disparaît de la liste pour que personne d'autre ne l'achète.</span>
+                <span><strong class="text-slate-800 block mb-0.5">Réserve-le</strong>Appuie sur «&nbsp;Je réserve ce cadeau&nbsp;»&nbsp;: il disparaît de la liste, personne d'autre ne l'offrira.</span>
             </li>
-            <li class="flex sm:flex-col sm:text-center items-start sm:items-center gap-3">
+            <li class="flex items-start gap-3">
                 <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">3</span>
-                <span><strong class="text-slate-800">Achetez-le vous-même</strong>, en magasin ou en ligne. Wishi ne commande et ne paie rien.</span>
+                <span><strong class="text-slate-800 block mb-0.5">Achète-le de ton côté</strong>En magasin ou en ligne, comme tu préfères&nbsp;: Wishi ne commande et ne paie rien. Pas à l'aise pour commander&nbsp;? Demande à Elodie ou JC, ils s'en occupent avec plaisir 🙂</span>
+            </li>
+            <li class="flex items-start gap-3">
+                <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">4</span>
+                <span><strong class="text-slate-800 block mb-0.5">Retrouve tes cadeaux</strong>Le bouton «&nbsp;🎁 Mes cadeaux&nbsp;», juste en dessous, liste tout ce que tu as réservé, avec le lien du magasin. Sur un autre téléphone&nbsp;? Envoie-toi le lien depuis cette page.</span>
             </li>
         </ol>
     </section>
@@ -151,18 +156,18 @@
 
                 <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 mb-6 text-sm text-amber-900 leading-snug">
                     <p class="font-bold mb-1">Bon à savoir</p>
-                    <p>Wishi <strong>ne commande rien et ne paie rien</strong>. En réservant, vous prévenez simplement la famille que vous vous occupez de ce cadeau. C'est ensuite à vous de l'acheter, où vous voulez.</p>
+                    <p>Wishi <strong>ne commande rien et ne paie rien</strong>. En réservant, tu préviens simplement la famille que tu t'occupes de ce cadeau. C'est ensuite à toi de l'acheter, où tu veux.</p>
                 </div>
 
                 <form class="space-y-5" @submit.prevent="confirmGift()">
                     <div>
-                        <label for="donor_name" class="text-sm font-bold text-slate-700 block mb-2 px-1">Votre prénom</label>
+                        <label for="donor_name" class="text-sm font-bold text-slate-700 block mb-2 px-1">Ton prénom</label>
                         <input id="donor_name" type="text" x-model="donorName" placeholder="Ex : Mamie Jo" required autocomplete="given-name" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all">
                     </div>
                     <div>
-                        <label for="donor_email" class="text-sm font-bold text-slate-700 block mb-2 px-1">Votre email <span class="font-medium text-slate-400">(facultatif, conseillé)</span></label>
-                        <input id="donor_email" type="email" x-model="donorEmail" placeholder="vous@email.com" autocomplete="email" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all">
-                        <p class="text-xs text-slate-500 mt-2 px-1 leading-snug">Il sert seulement à retrouver vos cadeaux si vous changez de téléphone ou d'ordinateur. Personne ne le voit, aucun message ne vous sera envoyé.</p>
+                        <label for="donor_email" class="text-sm font-bold text-slate-700 block mb-2 px-1">Ton email <span class="font-medium text-slate-400">(facultatif, conseillé)</span></label>
+                        <input id="donor_email" type="email" x-model="donorEmail" placeholder="toi@email.com" autocomplete="email" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-<?= $color ?>-500 focus:bg-white font-bold transition-all">
+                        <p class="text-xs text-slate-500 mt-2 px-1 leading-snug">Il sert seulement à retrouver tes cadeaux si tu changes de téléphone ou d'ordinateur. Personne ne le voit, et tu ne recevras aucun message.</p>
                     </div>
                     <p x-show="errorMessage" x-text="errorMessage" class="text-sm font-bold text-red-600"></p>
                     <button type="submit" :disabled="sending" class="w-full py-4 bg-<?= $color ?>-600 text-white rounded-xl font-bold shadow-lg shadow-<?= $color ?>-100 hover:brightness-110 active:scale-95 transition-all text-lg disabled:opacity-60">
@@ -176,12 +181,12 @@
                 <div class="text-5xl mb-3">✅</div>
                 <h3 class="text-2xl font-bold text-slate-900 mb-2">C'est noté&nbsp;!</h3>
                 <p class="text-slate-600 text-sm leading-snug mb-6">
-                    <strong x-text="selectedItemTitle"></strong> est mis de côté pour vous. Personne d'autre ne pourra le réserver.
+                    <strong x-text="selectedItemTitle"></strong> est mis de côté pour toi. Personne d'autre ne pourra le réserver.
                 </p>
 
                 <div class="rounded-2xl bg-<?= $color ?>-50 border border-<?= $color ?>-200 p-5 mb-6 text-left">
-                    <p class="font-black text-slate-900 mb-1">🛒 Maintenant, à vous de l'acheter</p>
-                    <p class="text-sm text-slate-600 leading-snug">Wishi n'a rien commandé. Achetez ce cadeau vous-même, en magasin ou sur internet.</p>
+                    <p class="font-black text-slate-900 mb-1">🛒 Maintenant, à toi de l'acheter</p>
+                    <p class="text-sm text-slate-600 leading-snug">Wishi n'a rien commandé. Achète ce cadeau de ton côté, en magasin ou sur internet. Besoin d'un coup de main pour le commander&nbsp;? Demande à Elodie ou JC.</p>
                     <a x-show="shopUrl" :href="shopUrl" target="_blank" rel="noreferrer noopener"
                        class="mt-4 block w-full py-3 bg-<?= $color ?>-600 text-white rounded-xl font-bold text-center hover:brightness-110 transition-all"
                        x-text="shopLabel ? 'Voir le produit sur ' + shopLabel : 'Voir le produit'"></a>
@@ -189,7 +194,7 @@
 
                 <div class="rounded-2xl border border-slate-200 p-5 mb-6 text-left">
                     <p class="font-bold text-slate-800 mb-1">📋 Retrouver mes cadeaux plus tard</p>
-                    <p class="text-sm text-slate-600 leading-snug">Tous les cadeaux que vous réservez sont rangés dans <strong>«&nbsp;Mes cadeaux&nbsp;»</strong>, en haut de chaque liste. Pour les retrouver sur un autre appareil, envoyez-vous ce lien.</p>
+                    <p class="text-sm text-slate-600 leading-snug">Tous les cadeaux que tu réserves sont rangés dans <strong>«&nbsp;Mes cadeaux&nbsp;»</strong>, en haut de chaque liste. Pour les retrouver sur un autre appareil, envoie-toi ce lien.</p>
                     <div class="mt-4 grid gap-2 sm:grid-cols-2">
                         <a href="/mes-cadeaux" class="py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm text-center hover:bg-slate-100 transition-colors">Voir mes cadeaux</a>
                         <button type="button" @click="shareMyGiftsLink(myGiftsLink)" class="py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm text-center hover:bg-slate-100 transition-colors">📤 M'envoyer ce lien</button>
