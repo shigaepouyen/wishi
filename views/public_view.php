@@ -115,9 +115,6 @@
                                 <?php endif; ?>
                             </div>
                             <h3 class="font-bold text-slate-800 text-lg leading-tight truncate-2-lines"><?= htmlspecialchars($item['title']) ?></h3>
-                            <?php if (!empty($item['description'])): ?>
-                                <p class="text-[11px] text-slate-500 mt-1.5 leading-snug line-clamp-3"><?= nl2br(htmlspecialchars($item['description'])) ?></p>
-                            <?php endif; ?>
                             <?php $priceHtml = \App\Utils\FormatUtils::formatDualPrice($item['price'], $item['currency'], $item['price_eur']); ?>
                             <?php if ($priceHtml !== ''): ?>
                                 <p class="font-black text-xl mt-2 text-slate-900 tracking-tight"><?= $priceHtml ?></p>
@@ -126,6 +123,10 @@
                             <?php endif; ?>
                         </div>
                     </div>
+
+                    <?php if (!empty($item['description'])): ?>
+                        <p class="text-sm text-slate-600 leading-relaxed -mt-1 mb-5"><?= nl2br(htmlspecialchars($item['description'])) ?></p>
+                    <?php endif; ?>
 
                     <div class="flex gap-2 mt-auto">
                         <?php if($item['url']): ?>
