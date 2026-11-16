@@ -98,16 +98,38 @@ class Security {
         return $pin !== '' && is_string($hash) && $hash !== '' && password_verify($pin, $hash);
     }
 
-    public static function makeReservationCookieValue(int $itemId): string {
-        return hash_hmac('sha256', 'reservation:' . $itemId, self::getAppSecret());
+    /**
+     * Identifiant anonyme du navigateur qui offre des cadeaux (« Mes cadeaux »).
+     * C'est un secret porteur : quiconque l'a voit et peut annuler les cadeaux qui y sont rattaches.
+     */
+    public const DONOR_COOKIE = 'wishi_donor';
+
+    public static function isValidDonorToken(?string $token): bool {
+        return is_string($token) && preg_match('/^[a-f0-9]{32}$/', $token) === 1;
     }
 
-    public static function hasValidReservationCookie(int $itemId, ?string $cookieValue): bool {
-        if (!$cookieValue) {
-            return false;
-        }
+    public static function getDonorToken(): ?string {
+        $token = $_COOKIE[self::DONOR_COOKIE] ?? null;
+        return self::isValidDonorToken($token) ? $token : null;
+    }
 
-        return hash_equals(self::makeReservationCookieValue($itemId), $cookieValue);
+    /** Pose (ou prolonge) le cookie du donateur pour un an. */
+    public static function setDonorCookie(string $token): void {
+        setcookie(self::DONOR_COOKIE, $token, [
+            'expires' => time() + 365 * 24 * 3600,
+            'path' => '/',
+            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        $_COOKIE[self::DONOR_COOKIE] = $token;
+    }
+
+    /** Renvoie l'identifiant de ce navigateur, en le creant au besoin. */
+    public static function ensureDonorToken(): string {
+        $token = self::getDonorToken() ?? bin2hex(random_bytes(16));
+        self::setDonorCookie($token);
+        return $token;
     }
 
     public static function assertSafeExternalUrl(string $url): void {

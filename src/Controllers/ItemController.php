@@ -109,97 +109,157 @@ class ItemController {
 
     public function markAsTaken() {
         $input = json_decode(file_get_contents('php://input'), true);
-        
+
         $itemId = isset($input['item_id']) ? (int)$input['item_id'] : null;
         $name = Security::sanitizeName($input['name'] ?? null, 80, 'Anonyme');
-        $email = Security::sanitizeOptionalEmail($input['email'] ?? null);
+        $rawEmail = trim((string)($input['email'] ?? ''));
+        $email = Security::sanitizeOptionalEmail($rawEmail);
 
         if (!$itemId) {
             return json_encode(['error' => 'ID de l\'article manquant']);
         }
 
-        // L'email est la cle pour retrouver ses reservations : sans lui, impossible de les revoir ou de les annuler.
-        if ($email === null) {
-            return json_encode(['error' => 'Un email valide est nécessaire pour retrouver ou annuler votre cadeau.']);
+        // L'email est facultatif (le navigateur garde deja la trace du cadeau), mais s'il est saisi il doit etre valide.
+        if ($rawEmail !== '' && $email === null) {
+            return json_encode(['error' => 'Cet email ne semble pas valide. Corrigez-le ou laissez la case vide.']);
         }
 
         try {
             $db = \App\Utils\Database::getConnection();
-            $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by = ?, donor_email = ? WHERE id = ? AND is_taken = 0");
-            $stmt->execute([$name, $email, $itemId]);
+            $token = Security::ensureDonorToken();
+            $stmt = $db->prepare("UPDATE items SET is_taken = 1, taken_by = ?, donor_email = ?, donor_token = ? WHERE id = ? AND is_taken = 0");
+            $stmt->execute([$name, $email, $token, $itemId]);
 
             if ($stmt->rowCount() === 0) {
-                return json_encode(['error' => 'Ce cadeau est déjà réservé.']);
+                return json_encode(['error' => 'Ce cadeau vient d\'être réservé par quelqu\'un d\'autre.']);
             }
 
-            // Définir un cookie de session pour permettre l'annulation immédiate
-            setcookie("reserved_item_" . $itemId, Security::makeReservationCookieValue($itemId), [
-                'expires' => time() + 3600,
-                'path' => '/',
-                'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
-                'httponly' => true,
-                'samesite' => 'Lax',
-            ]);
+            $stmt = $db->prepare("SELECT url FROM items WHERE id = ?");
+            $stmt->execute([$itemId]);
+            $url = (string)$stmt->fetchColumn();
 
-            return json_encode(['success' => true]);
+            return json_encode([
+                'success' => true,
+                'shop_url' => $url !== '' ? $url : null,
+                'shop_label' => $url !== '' ? UrlUtils::getDomainLabel($url) : null,
+                'my_gifts_count' => $this->countMyGifts($token),
+                'my_gifts_link' => self::myGiftsLink($token),
+            ]);
         } catch (\PDOException $e) {
             return json_encode(['error' => 'Erreur base de données : ' . $e->getMessage()]);
         }
     }
 
+    /** Lien personnel vers « Mes cadeaux », a garder pour les retrouver depuis un autre appareil. */
+    public static function myGiftsLink(string $token): string {
+        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        return ($https ? 'https' : 'http') . '://' . $host . '/mes-cadeaux?k=' . $token;
+    }
+
     /**
-     * "Mes reservations" : les cadeaux reserves par cet email sur toutes les listes du meme profil,
-     * plus ceux reserves depuis ce navigateur (cookie). Ne renvoie jamais le prenom des donateurs.
+     * Condition SQL « ce cadeau appartient a ce donateur » : reserve depuis ce navigateur,
+     * ou avec un email deja utilise depuis ce navigateur (reservations faites sur un autre appareil).
      */
-    public function myReservations() {
+    private const MY_GIFTS_WHERE = "i.is_taken = 1 AND (
+            i.donor_token = :token
+            OR (i.donor_email IS NOT NULL AND LOWER(i.donor_email) IN (
+                SELECT LOWER(donor_email) FROM items WHERE donor_token = :token AND donor_email IS NOT NULL
+            ))
+        )";
+
+    public function countMyGifts(?string $token): int {
+        if (!Security::isValidDonorToken($token)) return 0;
+        $db = \App\Utils\Database::getConnection();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM items i WHERE " . self::MY_GIFTS_WHERE);
+        $stmt->execute(['token' => $token]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /** Les cadeaux de ce donateur, toutes personnes et toutes listes confondues. */
+    public function myGifts(?string $token): array {
+        if (!Security::isValidDonorToken($token)) return [];
+        $db = \App\Utils\Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT i.id, i.title, i.image_url, i.url, i.price, i.currency, i.price_eur,
+                   l.name AS list_name, l.slug_public, l.slug_hub, l.hub_visible,
+                   p.name AS owner_name, p.emoji AS owner_emoji, p.slug AS profile_slug, p.color
+            FROM items i
+            JOIN lists l ON i.list_id = l.id
+            JOIN profiles p ON l.profile_id = p.id
+            WHERE " . self::MY_GIFTS_WHERE . "
+            ORDER BY p.name ASC, l.name ASC, i.id ASC
+        ");
+        $stmt->execute(['token' => $token]);
+        return $stmt->fetchAll();
+    }
+
+    /** Le lien personnel ouvert sur un autre appareil : on rattache ce navigateur au meme donateur. */
+    public function adoptDonorToken(?string $token): bool {
+        if (!Security::isValidDonorToken($token)) return false;
+        $db = \App\Utils\Database::getConnection();
+        $stmt = $db->prepare("SELECT 1 FROM items WHERE donor_token = ? AND is_taken = 1 LIMIT 1");
+        $stmt->execute([$token]);
+        if (!$stmt->fetchColumn()) return false;
+        $this->switchDonorToken($token);
+        return true;
+    }
+
+    /**
+     * Rattache ce navigateur a un autre identifiant. Les cadeaux deja reserves depuis ce navigateur
+     * suivent (fusion), pour ne pas disparaitre de sa page « Mes cadeaux ».
+     */
+    private function switchDonorToken(string $token): void {
+        $current = Security::getDonorToken();
+        if ($current !== null && $current !== $token) {
+            $db = \App\Utils\Database::getConnection();
+            $stmt = $db->prepare("UPDATE items SET donor_token = ? WHERE donor_token = ?");
+            $stmt->execute([$token, $current]);
+        }
+        Security::setDonorCookie($token);
+    }
+
+    /**
+     * « J'ai change de telephone » : retrouve les cadeaux reserves avec cet email
+     * et les rattache a ce navigateur. Limite d'essais contre la devinette d'emails.
+     */
+    public function findGiftsByEmail() {
         $input = json_decode(file_get_contents('php://input'), true);
-        $listSlug = is_string($input['list_slug'] ?? null) ? $input['list_slug'] : '';
         $email = Security::sanitizeOptionalEmail($input['email'] ?? null);
+        if ($email === null) {
+            return json_encode(['error' => 'Indiquez l\'email utilisé au moment de réserver.']);
+        }
+
+        if (\App\Utils\LoginThrottle::secondsLocked(0, 'gifts') > 0) {
+            return json_encode(['error' => 'Trop d\'essais. Réessayez dans quelques minutes.']);
+        }
 
         $db = \App\Utils\Database::getConnection();
-        $stmt = $db->prepare("SELECT profile_id FROM lists WHERE slug_public = ?");
-        $stmt->execute([$listSlug]);
-        $profileId = (int)$stmt->fetchColumn();
-        if (!$profileId) {
-            return json_encode(['error' => 'Liste introuvable.']);
+        $stmt = $db->prepare("SELECT id, donor_token FROM items WHERE is_taken = 1 AND LOWER(donor_email) = LOWER(?) ORDER BY id DESC");
+        $stmt->execute([$email]);
+        $rows = $stmt->fetchAll();
+        if (!$rows) {
+            \App\Utils\LoginThrottle::registerFailure(0, 'gifts');
+            return json_encode(['error' => 'Aucun cadeau réservé avec cet email.']);
         }
 
-        $select = "SELECT i.id, i.title, i.image_url, l.name AS list_name
-                   FROM items i JOIN lists l ON i.list_id = l.id
-                   WHERE l.profile_id = ? AND i.is_taken = 1";
-        $items = [];
-
-        if ($email !== null) {
-            if (\App\Utils\LoginThrottle::secondsLocked($profileId, 'reservations') > 0) {
-                return json_encode(['error' => 'Trop d\'essais. Réessayez dans quelques minutes.']);
-            }
-            $stmt = $db->prepare($select . " AND LOWER(i.donor_email) = LOWER(?)");
-            $stmt->execute([$profileId, $email]);
-            $items = $stmt->fetchAll();
-            if (!$items) {
-                \App\Utils\LoginThrottle::registerFailure($profileId, 'reservations');
-            }
+        // On reprend l'identifiant d'un appareil deja utilise (les deux appareils voient alors la meme page),
+        // sinon (anciennes reservations) on en cree un et on y rattache les cadeaux.
+        $existing = array_values(array_filter(array_column($rows, 'donor_token'), [Security::class, 'isValidDonorToken']));
+        if ($existing) {
+            $this->switchDonorToken($existing[0]);
+        } else {
+            $token = Security::ensureDonorToken();
+            $stmt = $db->prepare("UPDATE items SET donor_token = ? WHERE is_taken = 1 AND donor_token IS NULL AND LOWER(donor_email) = LOWER(?)");
+            $stmt->execute([$token, $email]);
         }
 
-        // Reservations faites depuis ce navigateur (utile quand l'email d'origine n'est plus saisi)
-        $known = array_column($items, 'id');
-        $stmt = $db->prepare($select);
-        $stmt->execute([$profileId]);
-        foreach ($stmt->fetchAll() as $row) {
-            if (!in_array($row['id'], $known) && Security::hasValidReservationCookie((int)$row['id'], $_COOKIE["reserved_item_" . $row['id']] ?? null)) {
-                $items[] = $row;
-            }
-        }
-
-        return json_encode(['success' => true, 'items' => array_map(function ($row) {
-            return ['id' => (int)$row['id'], 'title' => $row['title'], 'image_url' => $row['image_url'], 'list_name' => $row['list_name']];
-        }, $items)]);
+        return json_encode(['success' => true, 'count' => count($rows)]);
     }
 
     public function cancelReservation() {
         $input = json_decode(file_get_contents('php://input'), true);
         $itemId = isset($input['item_id']) ? (int)$input['item_id'] : null;
-        $email = isset($input['email']) ? trim($input['email']) : null;
 
         if (!$itemId) {
             return json_encode(['error' => 'ID de l\'article manquant']);
@@ -208,39 +268,18 @@ class ItemController {
         try {
             $db = \App\Utils\Database::getConnection();
 
-            // On vérifie d'abord si l'article est réservé
-            $stmt = $db->prepare("SELECT is_taken, donor_email FROM items WHERE id = ?");
+            // Seul le donateur (meme navigateur, ou navigateur rattache par lien/email) peut annuler.
+            $stmt = $db->prepare("SELECT i.id FROM items i WHERE i.id = :id AND " . self::MY_GIFTS_WHERE);
+            $stmt->execute(['id' => $itemId, 'token' => Security::getDonorToken() ?? '']);
+
+            if (!$stmt->fetchColumn()) {
+                return json_encode(['error' => 'Ce cadeau n\'est pas (ou plus) réservé à votre nom.']);
+            }
+
+            $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL, donor_token = NULL WHERE id = ?");
             $stmt->execute([$itemId]);
-            $item = $stmt->fetch();
 
-            if (!$item || !$item['is_taken']) {
-                return json_encode(['error' => 'Cet article n\'est pas réservé.']);
-            }
-
-            $canCancel = false;
-
-            // 1. Vérification par cookie (annulation immédiate sur le même navigateur)
-            if (Security::hasValidReservationCookie($itemId, $_COOKIE["reserved_item_" . $itemId] ?? null)) {
-                $canCancel = true;
-            }
-
-            // 2. Vérification par email (si renseigné et correspond)
-            if ($email && $item['donor_email'] && strtolower($email) === strtolower($item['donor_email'])) {
-                $canCancel = true;
-            }
-
-            if ($canCancel) {
-                $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL WHERE id = ?");
-                $stmt->execute([$itemId]);
-
-                // Supprimer le cookie si présent
-                setcookie("reserved_item_" . $itemId, "", time() - 3600, "/");
-
-                return json_encode(['success' => true]);
-            } else {
-                return json_encode(['error' => 'Vous n\'avez pas l\'autorisation d\'annuler cette réservation.']);
-            }
-
+            return json_encode(['success' => true]);
         } catch (\PDOException $e) {
             return json_encode(['error' => 'Erreur base de données : ' . $e->getMessage()]);
         }

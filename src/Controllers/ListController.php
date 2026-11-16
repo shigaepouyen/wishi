@@ -211,7 +211,7 @@ class ListController {
         if ($error = AdminAuth::ensureListAccessJson($id)) return $error;
 
         $db = \App\Utils\Database::getConnection();
-        $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL WHERE list_id = ?");
+        $stmt = $db->prepare("UPDATE items SET is_taken = 0, taken_by = NULL, donor_email = NULL, donor_token = NULL WHERE list_id = ?");
         $stmt->execute([$id]);
         return json_encode(['success' => true]);
     }
