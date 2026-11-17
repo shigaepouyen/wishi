@@ -54,7 +54,8 @@ if (!AiConfig::isEnabled()) {
 $db = Database::getConnection();
 
 // Mode « save » (mise à jour de toute la liste) : l'article est relu en base, la description
-// existante sert de notes (pour garder taille, couleur…) et le résultat est enregistré.
+// existante est fournie comme ancienne version a reecrire (on n'en garde que taille, couleur…,
+// pas la formulation) et le résultat est enregistré.
 $save = !empty($input['save']);
 if ($save) {
     if ($itemId <= 0) {
@@ -72,7 +73,8 @@ if ($save) {
         'price' => $item['price'],
         'currency' => $item['currency'],
         'category' => $item['category'],
-        'notes' => $item['description'],
+        'notes' => '',
+        'previous_description' => $item['description'],
         'page_description' => '',
     ];
 }
@@ -121,6 +123,7 @@ try {
         'currency' => (string) ($input['currency'] ?? 'EUR'),
         'category' => (string) ($input['category'] ?? ''),
         'notes' => (string) ($input['notes'] ?? ''),
+        'previous_description' => (string) ($input['previous_description'] ?? ''),
         'page_description' => $pageDescription,
         'list_name' => $listName,
         'siblings' => $siblings,
