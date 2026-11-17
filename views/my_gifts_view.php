@@ -1,7 +1,7 @@
 <div class="max-w-2xl mx-auto py-12 px-4">
     <header class="text-center mb-10">
         <div class="text-6xl mb-4">🎁</div>
-        <h1 class="text-4xl font-black text-slate-900 tracking-tight">Mes cadeaux</h1>
+        <h1 class="text-4xl font-black text-slate-900 tracking-tight">Mes cadeaux à offrir</h1>
         <p class="text-slate-500 mt-3 text-sm leading-snug max-w-md mx-auto">
             Les cadeaux que tu as réservés, sur toutes les listes.
             <strong class="text-slate-700">Wishi ne commande rien&nbsp;:</strong> c'est à toi de les acheter.

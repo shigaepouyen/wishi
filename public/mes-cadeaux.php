@@ -41,7 +41,7 @@ foreach ($gifts as $gift) {
 
 $myGiftsLink = ($token && $gifts) ? ItemController::myGiftsLink($token) : null;
 
-$title = 'Wishi - Mes cadeaux';
+$title = 'Wishi - Mes cadeaux à offrir';
 $body_class = 'bg-slate-50';
 $body_attrs = 'x-data="myGiftsPage()"';
 

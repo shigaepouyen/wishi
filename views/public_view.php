@@ -39,10 +39,16 @@
         </p>
     </div>
 
-    <section class="mb-10 max-w-3xl mx-auto bg-white rounded-3xl border border-<?= $color ?>-200 p-6 shadow-sm">
-        <h2 class="text-base font-black text-slate-800 mb-1 text-center">Comment ça marche&nbsp;?</h2>
-        <p class="text-sm text-slate-500 text-center mb-5">Quatre étapes, et zéro cadeau en double 🎉</p>
-        <ol class="grid gap-5 sm:grid-cols-2 text-sm text-slate-600 leading-snug">
+    <!-- Mode d'emploi repliable : ouvert a la premiere visite, replie ensuite (memorise dans le navigateur) -->
+    <details id="how-it-works" class="group mb-10 max-w-3xl mx-auto bg-white rounded-3xl border border-<?= $color ?>-200 shadow-sm">
+        <summary class="flex items-center justify-between gap-3 px-6 py-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <span>
+                <span class="block text-base font-black text-slate-800">Comment ça marche&nbsp;?</span>
+                <span class="block text-sm text-slate-500">Quatre étapes, et zéro cadeau en double 🎉</span>
+            </span>
+            <svg class="w-5 h-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+        <ol class="grid gap-5 sm:grid-cols-2 text-sm text-slate-600 leading-snug px-6 pb-6 pt-2">
             <li class="flex items-start gap-3">
                 <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">1</span>
                 <span><strong class="text-slate-800 block mb-0.5">Trouve ton bonheur</strong>Parcours la liste et repère le cadeau qui te tente.</span>
@@ -57,19 +63,29 @@
             </li>
             <li class="flex items-start gap-3">
                 <span class="shrink-0 w-9 h-9 rounded-full bg-<?= $color ?>-50 text-<?= $color ?>-600 flex items-center justify-center font-black">4</span>
-                <span><strong class="text-slate-800 block mb-0.5">Retrouve tes cadeaux</strong>Le bouton «&nbsp;🎁 Mes cadeaux&nbsp;», juste en dessous, liste tout ce que tu as réservé, avec le lien du magasin. Sur un autre téléphone&nbsp;? Envoie-toi le lien depuis cette page.</span>
+                <span><strong class="text-slate-800 block mb-0.5">Retrouve tes cadeaux</strong>Le bouton «&nbsp;🎁 Mes cadeaux à offrir&nbsp;», juste en dessous, liste tout ce que tu as réservé, avec le lien du magasin. Sur un autre téléphone&nbsp;? Envoie-toi le lien depuis cette page.</span>
             </li>
         </ol>
-    </section>
+    </details>
+    <script>
+        (function () {
+            var box = document.getElementById('how-it-works');
+            var seen = false;
+            try { seen = localStorage.getItem('wishi_howto_seen') === '1'; } catch (e) {}
+            // Deja vu, ou arrivee sur un filtre : on garde replie pour aller droit a la liste
+            box.open = !seen && !location.hash;
+            try { localStorage.setItem('wishi_howto_seen', '1'); } catch (e) {}
+        })();
+    </script>
 
-    <div class="mb-10">
+    <div id="cadeaux" class="mb-10 scroll-mt-4">
         <div class="flex flex-wrap justify-center gap-2">
-            <a href="<?= htmlspecialchars($publicLink(['sort' => $sort])) ?>"
+            <a href="<?= htmlspecialchars($publicLink(['sort' => $sort])) ?>#cadeaux"
                class="px-5 py-2.5 rounded-full text-[10px] uppercase tracking-wider font-bold transition-all <?= $catFilter == '' ? "bg-$color-600 text-white shadow-md shadow-$color-100" : 'bg-white text-slate-400 border border-slate-200 hover:border-'.$color.'-300' ?>">
                 Tous
             </a>
             <?php foreach($allCategories as $c): ?>
-                <a href="<?= htmlspecialchars($publicLink(['cat' => $c, 'sort' => $sort])) ?>"
+                <a href="<?= htmlspecialchars($publicLink(['cat' => $c, 'sort' => $sort])) ?>#cadeaux"
                    class="px-5 py-2.5 rounded-full text-[10px] uppercase tracking-wider font-bold transition-all <?= $catFilter == $c ? "bg-$color-600 text-white shadow-md shadow-$color-100" : 'bg-white text-slate-400 border border-slate-200 hover:border-'.$color.'-300' ?>">
                     <?= htmlspecialchars($c) ?>
                 </a>
@@ -82,7 +98,7 @@
 
         <div class="flex items-center gap-3">
             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trier par :</label>
-            <select onchange="window.location.href='<?= htmlspecialchars($publicLink(['cat' => $catFilter])) ?><?= str_contains($publicLink(['cat' => $catFilter]), '?') ? '&' : '?' ?>sort=' + this.value"
+            <select onchange="window.location.href='<?= htmlspecialchars($publicLink(['cat' => $catFilter])) ?><?= str_contains($publicLink(['cat' => $catFilter]), '?') ? '&' : '?' ?>sort=' + this.value + '#cadeaux'"
                     class="bg-white border border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider font-bold rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-<?= $color ?>-500 shadow-sm cursor-pointer transition-all">
                 <option value="priority" <?= ($data['currentSort'] == 'priority' || $data['currentSort'] == 'position') ? 'selected' : '' ?>>✨ Ordre de <?= htmlspecialchars($ownerName) ?></option>
                 <option value="price_asc" <?= $data['currentSort'] == 'price_asc' ? 'selected' : '' ?>>Prix croissant</option>
@@ -195,7 +211,7 @@
 
                 <div class="rounded-2xl border border-slate-200 p-5 mb-6 text-left">
                     <p class="font-bold text-slate-800 mb-1">📋 Retrouver mes cadeaux plus tard</p>
-                    <p class="text-sm text-slate-600 leading-snug">Tous les cadeaux que tu réserves sont rangés dans <strong>«&nbsp;Mes cadeaux&nbsp;»</strong>, en haut de chaque liste. Pour les retrouver sur un autre appareil, envoie-toi ce lien.</p>
+                    <p class="text-sm text-slate-600 leading-snug">Tous les cadeaux que tu réserves sont rangés dans <strong>«&nbsp;Mes cadeaux à offrir&nbsp;»</strong>, en haut de chaque liste. Pour les retrouver sur un autre appareil, envoie-toi ce lien.</p>
                     <div class="mt-4 grid gap-2 sm:grid-cols-2">
                         <a href="/mes-cadeaux" class="py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm text-center hover:bg-slate-100 transition-colors">Voir mes cadeaux</a>
                         <button type="button" @click="shareMyGiftsLink(myGiftsLink)" class="py-3 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm text-center hover:bg-slate-100 transition-colors">📤 M'envoyer ce lien</button>
