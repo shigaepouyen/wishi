@@ -9,7 +9,8 @@ use App\Utils\UrlUtils;
  * Redige la description courte (2 a 3 phrases) d'un article de liste, a partir de ce que
  * le proprietaire a saisi, de ce que la page produit a renvoye et du contexte de la liste.
  *
- * Fiche neutre : on decrit l'objet, sans prenom ni argument de vente. La liste publique
+ * Ton vivant : on presente l'objet comme a un proche (l'histoire pour un livre ou un film,
+ * ce qu'on en fait pour un jeu), sans prenom ni formule de catalogue. La liste publique
  * l'affiche sous le titre, la famille doit comprendre en un coup d'oeil de quoi il s'agit.
  */
 final class GiftDescriptionService
@@ -21,11 +22,19 @@ final class GiftDescriptionService
 Tu rédiges la description d'un article dans une liste de cadeaux familiale.
 La description s'affiche sous le titre de l'article, pour les proches qui vont l'offrir.
 
+Le ton : celui de quelqu'un qui présente l'objet à un ami, avec envie. Vivant, simple, concret. Donne envie d'offrir, sans jargon ni ton de catalogue.
+
+Selon le type d'article :
+- Livre, BD, manga, film, série, jeu vidéo : raconte l'histoire. De quoi ça parle, qui est le héros, quelle aventure ou quel mystère, l'ambiance (drôle, frissons, magique…). Comme une quatrième de couverture : on pose le point de départ et l'enjeu, sans aucun spoiler (ni rebondissement, ni révélation, ni fin, ni sort des personnages). Pas de « cet ouvrage », pas de « appartient au genre », pas de fiche de bibliothèque.
+- Jeu, jouet, loisir créatif : ce qu'on fait avec et ce qui est amusant dedans.
+- Vêtement, objet du quotidien, matériel : ce que c'est et ce qui le rend chouette ou pratique.
+
 Règles :
-- 2 à 3 phrases courtes, en français, 300 caractères au maximum.
-- Fiche neutre et factuelle : ce qu'est l'objet, à quoi il sert, ce qui le distingue (matière, taille, contenu, fonctionnement, âge conseillé quand il est connu).
-- Pas de prénom, pas de « je », pas de « tu » ni de « vous », pas de prix, pas d'emoji, pas de superlatifs publicitaires, pas de nom de boutique.
-- N'invente aucune caractéristique absente des informations fournies. Si elles sont maigres, reste général plutôt que de deviner.
+- 2 à 3 phrases courtes, en français correct avec tous les accents et apostrophes, 300 caractères au maximum.
+- Commence directement par le cœur du sujet (l'histoire, le jeu, l'objet), jamais par « Ce livre est », « Cet ouvrage » ou « Il s'agit de ».
+- Pas de prénom, pas de « je », pas de « tu » ni de « vous », pas de prix, pas d'emoji, pas de nom de boutique, pas de formules creuses (« incontournable », « parfait pour tous », « idéal pour »).
+- Pour une œuvre connue (livre, film, série, jeu célèbre), tu peux t'appuyer sur ce que tu en sais avec certitude. Si tu ne connais pas l'œuvre et que la page ne dit rien de l'histoire, reste bref plutôt que d'inventer une intrigue.
+- N'invente aucune caractéristique matérielle (taille, matière, contenu, âge conseillé) absente des informations fournies.
 - Si des notes ont été saisies (taille, couleur, modèle, pointure…), garde ces précisions dans la description.
 - Le nom de la liste et les autres envies servent seulement à comprendre le contexte : ne les cite pas.
 TXT;
@@ -44,7 +53,7 @@ TXT;
 
     /**
      * @param array{title?:string, url?:string, price?:mixed, currency?:string, category?:string,
-     *              notes?:string, page_description?:string, list_name?:string, siblings?:string[]} $context
+     *              notes?:string, previous_description?:string, page_description?:string, list_name?:string, siblings?:string[]} $context
      */
     public function describe(array $context): string
     {
@@ -52,7 +61,7 @@ TXT;
             throw new LlmException("Donne d'abord un titre à l'article.");
         }
 
-        $payload = $this->gemini->generateJson(self::SYSTEM, self::buildPrompt($context), self::SCHEMA, 0.4);
+        $payload = $this->gemini->generateJson(self::SYSTEM, self::buildPrompt($context), self::SCHEMA, 0.7);
         $text = self::clean((string) ($payload['description'] ?? ''));
         if ($text === '') {
             throw new LlmException("L'IA n'a pas su décrire cet article.");
@@ -99,6 +108,13 @@ TXT;
             $lines[] = '';
             $lines[] = 'Notes déjà saisies par le propriétaire de la liste :';
             $lines[] = $notes;
+        }
+
+        $previous = self::cut($context['previous_description'] ?? '', 1000);
+        if ($previous !== '') {
+            $lines[] = '';
+            $lines[] = 'Ancienne description, à réécrire entièrement (n\'en garde que les précisions concrètes comme taille, couleur, modèle ; ni sa formulation ni son ton) :';
+            $lines[] = $previous;
         }
 
         $siblings = array_values(array_filter(array_map(
